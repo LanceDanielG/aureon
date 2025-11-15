@@ -1,18 +1,24 @@
 import './App.css'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import LogIn from './components/LogIn'
-import Home from './components/Home'
+import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import LogIn from './pages/LogIn'
+import Home from './pages/Home'
+import NotFound from './pages/404';
 
 function App() {
+    
+    const router = createBrowserRouter([
+        {
+            path: "/",
+            element: <Home/>,
+            errorElement: <NotFound/>
+        },
+        {
+            path: "/login",
+            element: <LogIn/>
+        }
+    ]);
 
-    return (
-        <Router>
-            <Routes>
-                <Route path='/' element={<LogIn/>}/>
-                <Route path='/home' element={<Home/>}/>
-            </Routes>
-        </Router>
-    )
+    return <RouterProvider router={router} />;
 }
 
 export default App

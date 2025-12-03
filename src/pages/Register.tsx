@@ -1,21 +1,23 @@
+import EmailIcon from '@mui/icons-material/Email';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import PasswordIcon from '@mui/icons-material/Password';
-import PersonIcon from '@mui/icons-material/Person';
 import { Button, Tooltip } from "@mui/material";
 import Box from '@mui/material/Box';
 import SvgIcon from '@mui/material/SvgIcon';
-import { signInWithPopup } from "firebase/auth";
-import { useNavigate } from "react-router-dom";
-import { auth, googleProvider } from "../config/firebase";
 import { FirebaseError } from 'firebase/app';
+import { signInWithPopup } from 'firebase/auth';
+import { useNavigate } from 'react-router-dom';
+import { auth, googleProvider } from '../config/firebase';
 import { useState } from 'react';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 
-export default function LogIn({isLogin = false}: {isLogin?: boolean}) {
+export default function Register({isLogin} : {isLogin?: boolean}) {
     const navigate = useNavigate();
     const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const togglePassword = () => setShowPassword(prev => !prev);
+    const toggleConfirmPassword = () => setShowConfirmPassword(prev => !prev);
     
     const signIn = async () => {
         try {
@@ -35,18 +37,18 @@ export default function LogIn({isLogin = false}: {isLogin?: boolean}) {
             }
         }
     }
-
+        
     return (
-        <div className={`px-5 form-box login absolute w-1/2 h-full bg-white right-0 flex items-center text-center text-gray-800 z-20 transition-normal delay-[.6s] ease-in-out transition-[visibility_0s_1s] ${isLogin ? 'right-[0%] bg-red-300' : ''}`}>
+        <div className={`px-5 form-box register absolute w-1/2 h-full bg-white right-0 items-center text-center text-gray-800 z-20 transition-normal delay-[.6s] ease-in-out transition-[visibility_0s_1s] ${isLogin ? 'hidden' : 'flex right-[50%]'}`}>
             <form action="" className="w-full">
-                <p className="text-2xl font-bold">Sign In</p>
+                <p className="text-2xl font-bold">Sign Up</p>
                 <div className="input-box relative m-[30px]">
                     <input 
                         type="text" 
                         placeholder="Email" 
-                        className="w-full ps-[20px] pe-[50px] py-[13px] rounded border-0 outline-0 bg-white placeholder-gray-400 placeholder:text-xs"
+                        className="w-full ps-[20px] pe-[50px] py-[13px] rounded border-0 outline-0 bg-white placeholder-gray-400 placeholder:text-xs" 
                     />
-                    <Box
+                    <EmailIcon
                         sx={{
                             position: 'absolute',
                             right: 15,
@@ -56,14 +58,14 @@ export default function LogIn({isLogin = false}: {isLogin?: boolean}) {
                             color: 'gray'
                         }}
                     >
-                        <PersonIcon/>
-                    </Box>
+                        <EmailIcon fontSize="small" />
+                    </EmailIcon>
                 </div>
                 <div className="input-box relative m-[30px]">
                     <input 
                         type={showPassword ? "text" : "password"}
                         placeholder="Password" 
-                        className="w-full ps-[20px] pe-[50px] py-[13px] rounded border-0 outline-0 bg-white placeholder-gray-400 placeholder:text-xs"
+                        className="w-full ps-[20px] pe-[50px] py-[13px] rounded border-0 outline-0 bg-white placeholder-gray-400 placeholder:text-xs" 
                     />
                     <Box
                         onClick={togglePassword}
@@ -79,10 +81,27 @@ export default function LogIn({isLogin = false}: {isLogin?: boolean}) {
                         {showPassword ? <Visibility/> : <VisibilityOff/>}
                     </Box>
                 </div>
-                <div className="forgot-link">
-                    <a href="#" className="text-xs">Forgot Password?</a>
+                <div className="input-box relative m-[30px]">
+                    <input 
+                        type={showConfirmPassword ? "text" : "password"}
+                        placeholder="Confirm Password" 
+                        className="w-full ps-[20px] pe-[50px] py-[13px] rounded border-0 outline-0 bg-white placeholder-gray-400 placeholder:text-xs" 
+                    />
+                    <Box
+                        onClick={toggleConfirmPassword}
+                        sx={{
+                            position: 'absolute',
+                            right: 15,
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            cursor: 'pointer',
+                            color: 'gray'
+                        }}
+                    >
+                        {showConfirmPassword ? <Visibility/> : <VisibilityOff/>}
+                    </Box>
                 </div>
-                <Button 
+                <Button
                     className="w-full"
                     variant="contained"
                     sx={{
@@ -91,7 +110,7 @@ export default function LogIn({isLogin = false}: {isLogin?: boolean}) {
                         mt: 2,
                     }}
                 >
-                    LogIn
+                    Register
                 </Button>
                 <div>
                     <div className="flex items-center h-[20px] mt-[24px] mb-[16px]">
@@ -101,11 +120,11 @@ export default function LogIn({isLogin = false}: {isLogin?: boolean}) {
                     </div>
                     <div className="mt-[10px] flex items-center justify-center gap-[15px]">
                         {/* <Tooltip title="Sign in with GitHub">
-                            <GitHubIcon 
+                            <GitHubIcon
                                 sx={{
                                     transition: 'transform 0.3s ease',
                                     '&:hover': {
-                                    transform: 'scale(1.2)',
+                                        transform: 'scale(1.2)',
                                     },
                                     cursor: 'pointer',
                                 }}
@@ -125,7 +144,7 @@ export default function LogIn({isLogin = false}: {isLogin?: boolean}) {
                                     cursor: 'pointer',
                                     transition: 'all 0.3s ease',
                                     '&:hover': {
-                                    transform: 'scale(1.1)',
+                                        transform: 'scale(1.1)',    
                                     },
                                 }}
                                 onClick={signIn}

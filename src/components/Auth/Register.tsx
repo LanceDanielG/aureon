@@ -1,27 +1,34 @@
 import EmailIcon from '@mui/icons-material/Email';
-import GitHubIcon from '@mui/icons-material/GitHub';
-import PasswordIcon from '@mui/icons-material/Password';
 import { Button, Tooltip } from "@mui/material";
 import Box from '@mui/material/Box';
 import SvgIcon from '@mui/material/SvgIcon';
 import { FirebaseError } from 'firebase/app';
 import { signInWithPopup } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
-import { auth, googleProvider } from '../config/firebase';
+import { auth, googleProvider } from '../../config/firebase';
 import { useState } from 'react';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 
 export default function Register({isLogin} : {isLogin?: boolean}) {
     const navigate = useNavigate();
+    
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+    const [emailSignUp, setEmailSignUp] = useState('');
+    const [passwordSignUp, setPasswordSignUp] = useState('');
+
+    const [emailSignIn, setEmailSignIn] = useState('');
+    const [passwordSignIn, setPasswordSignIn] = useState('');
+
     const togglePassword = () => setShowPassword(prev => !prev);
     const toggleConfirmPassword = () => setShowConfirmPassword(prev => !prev);
-    
-    const signIn = async () => {
+
+    const signIn = async (isGoogle: boolean = false) => {
         try {
-            await signInWithPopup(auth, googleProvider)
+            if (isGoogle) {
+                await signInWithPopup(auth, googleProvider)
+            }
             
             console.log("Sign In Clicked");
             navigate('/dashboard');
@@ -34,6 +41,8 @@ export default function Register({isLogin} : {isLogin?: boolean}) {
                 } else {
                     console.error("Sign-in error:", error);
                 }
+            } else {
+                console.error("Unexpected error:", error);
             }
         }
     }
@@ -46,7 +55,7 @@ export default function Register({isLogin} : {isLogin?: boolean}) {
                     <input 
                         type="text" 
                         placeholder="Email" 
-                        className="w-full ps-[20px] pe-[50px] py-[13px] rounded border-0 outline-0 bg-white placeholder-gray-400 placeholder:text-xs" 
+                        className="w-full ps-[20px] pe-[50px] py-[13px] rounded border-0 outline-0 bg-white placeholder-gray-400 placeholder:text-xs text-xs" 
                     />
                     <EmailIcon
                         sx={{
@@ -54,7 +63,6 @@ export default function Register({isLogin} : {isLogin?: boolean}) {
                             right: 15,
                             top: '50%',
                             transform: 'translateY(-50%)',
-                            cursor: 'pointer',
                             color: 'gray'
                         }}
                     >
@@ -65,7 +73,7 @@ export default function Register({isLogin} : {isLogin?: boolean}) {
                     <input 
                         type={showPassword ? "text" : "password"}
                         placeholder="Password" 
-                        className="w-full ps-[20px] pe-[50px] py-[13px] rounded border-0 outline-0 bg-white placeholder-gray-400 placeholder:text-xs" 
+                        className="w-full ps-[20px] pe-[50px] py-[13px] rounded border-0 outline-0 bg-white placeholder-gray-400 placeholder:text-xs text-xs" 
                     />
                     <Box
                         onClick={togglePassword}
@@ -85,7 +93,7 @@ export default function Register({isLogin} : {isLogin?: boolean}) {
                     <input 
                         type={showConfirmPassword ? "text" : "password"}
                         placeholder="Confirm Password" 
-                        className="w-full ps-[20px] pe-[50px] py-[13px] rounded border-0 outline-0 bg-white placeholder-gray-400 placeholder:text-xs" 
+                        className="w-full ps-[20px] pe-[50px] py-[13px] rounded border-0 outline-0 bg-white placeholder-gray-400 placeholder:text-xs text-xs" 
                     />
                     <Box
                         onClick={toggleConfirmPassword}
@@ -119,17 +127,6 @@ export default function Register({isLogin} : {isLogin?: boolean}) {
                         <div className="flex-1 h-[1px] bg-gray-400"></div>
                     </div>
                     <div className="mt-[10px] flex items-center justify-center gap-[15px]">
-                        {/* <Tooltip title="Sign in with GitHub">
-                            <GitHubIcon
-                                sx={{
-                                    transition: 'transform 0.3s ease',
-                                    '&:hover': {
-                                        transform: 'scale(1.2)',
-                                    },
-                                    cursor: 'pointer',
-                                }}
-                            />
-                        </Tooltip> */}
                         <Tooltip title="Sign in with Google">
                             <Box
                                 sx={{
@@ -138,6 +135,8 @@ export default function Register({isLogin} : {isLogin?: boolean}) {
                                     alignItems: 'center',
                                     width: 15,
                                     height: 15,
+                                    border: '1px solid #ddd',
+                                    padding: 2,
                                     borderRadius: '50%',
                                     backgroundColor: '#fff',
                                     boxShadow: 1,

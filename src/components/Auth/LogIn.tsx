@@ -1,12 +1,10 @@
-import GitHubIcon from '@mui/icons-material/GitHub';
-import PasswordIcon from '@mui/icons-material/Password';
 import PersonIcon from '@mui/icons-material/Person';
 import { Button, Tooltip } from "@mui/material";
 import Box from '@mui/material/Box';
 import SvgIcon from '@mui/material/SvgIcon';
 import { signInWithPopup } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
-import { auth, googleProvider } from "../config/firebase";
+import { auth, googleProvider } from "../../config/firebase";
 import { FirebaseError } from 'firebase/app';
 import { useState } from 'react';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
@@ -44,7 +42,7 @@ export default function LogIn({isLogin = false}: {isLogin?: boolean}) {
                     <input 
                         type="text" 
                         placeholder="Email" 
-                        className="w-full ps-[20px] pe-[50px] py-[13px] rounded border-0 outline-0 bg-white placeholder-gray-400 placeholder:text-xs"
+                        className="w-full ps-[20px] pe-[50px] py-[13px] rounded border-0 outline-0 bg-white placeholder-gray-400 placeholder:text-xs text-xs"
                     />
                     <Box
                         sx={{
@@ -52,7 +50,6 @@ export default function LogIn({isLogin = false}: {isLogin?: boolean}) {
                             right: 15,
                             top: '50%',
                             transform: 'translateY(-50%)',
-                            cursor: 'pointer',
                             color: 'gray'
                         }}
                     >
@@ -63,7 +60,7 @@ export default function LogIn({isLogin = false}: {isLogin?: boolean}) {
                     <input 
                         type={showPassword ? "text" : "password"}
                         placeholder="Password" 
-                        className="w-full ps-[20px] pe-[50px] py-[13px] rounded border-0 outline-0 bg-white placeholder-gray-400 placeholder:text-xs"
+                        className="w-full ps-[20px] pe-[50px] py-[13px] rounded border-0 outline-0 bg-white placeholder-gray-400 placeholder:text-xs text-xs"
                     />
                     <Box
                         onClick={togglePassword}
@@ -100,17 +97,6 @@ export default function LogIn({isLogin = false}: {isLogin?: boolean}) {
                         <div className="flex-1 h-[1px] bg-gray-400"></div>
                     </div>
                     <div className="mt-[10px] flex items-center justify-center gap-[15px]">
-                        {/* <Tooltip title="Sign in with GitHub">
-                            <GitHubIcon 
-                                sx={{
-                                    transition: 'transform 0.3s ease',
-                                    '&:hover': {
-                                    transform: 'scale(1.2)',
-                                    },
-                                    cursor: 'pointer',
-                                }}
-                            />
-                        </Tooltip> */}
                         <Tooltip title="Sign in with Google">
                             <Box
                                 sx={{
@@ -122,6 +108,8 @@ export default function LogIn({isLogin = false}: {isLogin?: boolean}) {
                                     borderRadius: '50%',
                                     backgroundColor: '#fff',
                                     boxShadow: 1,
+                                    border: '1px solid #ddd',
+                                    padding: 2,
                                     cursor: 'pointer',
                                     transition: 'all 0.3s ease',
                                     '&:hover': {

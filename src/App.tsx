@@ -1,6 +1,6 @@
 import './App.css'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
-import LogIn from './pages/LogIn'
+import LogIn from './components/Auth/LogIn'
 import Home from './pages/Home'
 import NotFound from './pages/404';
 
@@ -11,7 +11,7 @@ import '@fontsource/roboto/700.css';
 import "@fontsource/poppins/400.css";
 import "@fontsource/poppins/500.css";
 import "@fontsource/poppins/700.css";
-import Register from './pages/Register';
+import Register from './components/Auth/Register';
 import Dashboard from './pages/Dashboard';
 
 function App() {

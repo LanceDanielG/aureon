@@ -1,7 +1,7 @@
 import { Button } from "@mui/material";
 import { useState } from "react";
-import LogIn from "./LogIn";
-import Register from "./Register";
+import LogIn from "../components/Auth/LogIn";
+import Register from "../components/Auth/Register";
 
 export default function Home() {
     const [isLogin, setIsLogin] = useState(true);

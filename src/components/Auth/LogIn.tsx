@@ -2,7 +2,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import { Button, Tooltip } from "@mui/material";
 import Box from '@mui/material/Box';
 import SvgIcon from '@mui/material/SvgIcon';
-import { signInWithPopup } from "firebase/auth";
+import { signInWithPopup, signInWithEmailAndPassword } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import { auth, googleProvider } from "../../config/firebase";
 import { FirebaseError } from 'firebase/app';
@@ -12,6 +12,8 @@ import { Visibility, VisibilityOff } from '@mui/icons-material';
 export default function LogIn({ isLogin = false, setIsLogin }: { isLogin?: boolean, setIsLogin?: (isLogin: boolean) => void }) {
     const navigate = useNavigate();
     const [showPassword, setShowPassword] = useState(false);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
 
     const togglePassword = () => setShowPassword(prev => !prev);
 
@@ -34,14 +36,32 @@ export default function LogIn({ isLogin = false, setIsLogin }: { isLogin?: boole
         }
     }
 
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+            console.log("Logged In Successfully");
+            navigate('/dashboard');
+        } catch (error: unknown) {
+            if (error instanceof FirebaseError) {
+                console.error("Login error:", error.code, error.message);
+                // Handle specific errors here (e.g., show toast)
+            } else {
+                console.error("Unexpected error:", error);
+            }
+        }
+    };
+
     return (
         <div className={`px-5 form-box login absolute w-full md:w-1/2 h-full bg-white md:right-0 flex flex-col justify-center items-center text-center text-gray-800 transition-all duration-700 ease-in-out ${isLogin ? 'translate-x-0 opacity-100 z-50 md:right-[0%] md:z-20' : '-translate-x-[100%] opacity-0 z-0 md:opacity-100 md:z-20'}`}>
-            <form action="" className="w-full max-w-sm mx-auto">
+            <form onSubmit={handleLogin} className="w-full max-w-sm mx-auto">
                 <p className="text-4xl font-extrabold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-cyan-500 pb-1">Sign In</p>
                 <div className="input-box relative my-4">
                     <input
                         type="text"
                         placeholder="Email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                         className="w-full ps-[20px] pe-[50px] py-[15px] rounded-xl border-0 outline-none bg-gray-50 focus:bg-white focus:ring-2 focus:ring-cyan-400 transition-all shadow-sm placeholder-gray-400 text-sm"
                     />
                     <Box
@@ -60,6 +80,8 @@ export default function LogIn({ isLogin = false, setIsLogin }: { isLogin?: boole
                     <input
                         type={showPassword ? "text" : "password"}
                         placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
                         className="w-full ps-[20px] pe-[50px] py-[15px] rounded-xl border-0 outline-none bg-gray-50 focus:bg-white focus:ring-2 focus:ring-cyan-400 transition-all shadow-sm placeholder-gray-400 text-sm"
                     />
                     <Box
@@ -97,6 +119,7 @@ export default function LogIn({ isLogin = false, setIsLogin }: { isLogin?: boole
                             boxShadow: '0 20px 25px -5px rgba(6, 182, 212, 0.4)',
                         },
                     }}
+                    onClick={handleLogin}
                 >
                     LogIn
                 </Button>

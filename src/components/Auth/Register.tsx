@@ -3,7 +3,7 @@ import { Button, Tooltip } from "@mui/material";
 import Box from '@mui/material/Box';
 import SvgIcon from '@mui/material/SvgIcon';
 import { FirebaseError } from 'firebase/app';
-import { signInWithPopup } from 'firebase/auth';
+import { signInWithPopup, createUserWithEmailAndPassword } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { auth, googleProvider } from '../../config/firebase';
 import { useState } from 'react';
@@ -17,9 +17,7 @@ export default function Register({ isLogin, setIsLogin }: { isLogin?: boolean, s
 
     const [emailSignUp, setEmailSignUp] = useState('');
     const [passwordSignUp, setPasswordSignUp] = useState('');
-
-    const [emailSignIn, setEmailSignIn] = useState('');
-    const [passwordSignIn, setPasswordSignIn] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
 
     const togglePassword = () => setShowPassword(prev => !prev);
     const toggleConfirmPassword = () => setShowConfirmPassword(prev => !prev);
@@ -47,14 +45,38 @@ export default function Register({ isLogin, setIsLogin }: { isLogin?: boolean, s
         }
     }
 
+
+    const handleRegister = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (passwordSignUp !== confirmPassword) {
+            console.error("Passwords do not match");
+            return;
+        }
+
+        try {
+            await createUserWithEmailAndPassword(auth, emailSignUp, passwordSignUp);
+            console.log("Registered Successfully");
+            navigate('/dashboard');
+        } catch (error: unknown) {
+            if (error instanceof FirebaseError) {
+                console.error("Registration error:", error.code, error.message);
+                // Handle specific errors
+            } else {
+                console.error("Unexpected error:", error);
+            }
+        }
+    };
+
     return (
         <div className={`px-5 form-box register absolute w-full md:w-1/2 h-full bg-white md:right-0 flex flex-col justify-center items-center text-center text-gray-800 transition-all duration-700 ease-in-out ${isLogin ? 'translate-x-[100%] opacity-0 z-0 md:hidden' : 'translate-x-0 opacity-100 z-50 md:flex md:right-[50%] md:z-20'}`}>
-            <form action="" className="w-full max-w-sm mx-auto">
+            <form onSubmit={handleRegister} className="w-full max-w-sm mx-auto">
                 <p className="text-4xl font-extrabold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-cyan-500 pb-1">Sign Up</p>
                 <div className="input-box relative my-4">
                     <input
                         type="text"
                         placeholder="Email"
+                        value={emailSignUp}
+                        onChange={(e) => setEmailSignUp(e.target.value)}
                         className="w-full ps-[20px] pe-[50px] py-[15px] rounded-xl border-0 outline-none bg-gray-50 focus:bg-white focus:ring-2 focus:ring-cyan-400 transition-all shadow-sm placeholder-gray-400 text-sm"
                     />
                     <EmailIcon
@@ -73,6 +95,8 @@ export default function Register({ isLogin, setIsLogin }: { isLogin?: boolean, s
                     <input
                         type={showPassword ? "text" : "password"}
                         placeholder="Password"
+                        value={passwordSignUp}
+                        onChange={(e) => setPasswordSignUp(e.target.value)}
                         className="w-full ps-[20px] pe-[50px] py-[15px] rounded-xl border-0 outline-none bg-gray-50 focus:bg-white focus:ring-2 focus:ring-cyan-400 transition-all shadow-sm placeholder-gray-400 text-sm"
                     />
                     <Box
@@ -93,6 +117,8 @@ export default function Register({ isLogin, setIsLogin }: { isLogin?: boolean, s
                     <input
                         type={showConfirmPassword ? "text" : "password"}
                         placeholder="Confirm Password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
                         className="w-full ps-[20px] pe-[50px] py-[15px] rounded-xl border-0 outline-none bg-gray-50 focus:bg-white focus:ring-2 focus:ring-cyan-400 transition-all shadow-sm placeholder-gray-400 text-sm"
                     />
                     <Box
@@ -127,6 +153,7 @@ export default function Register({ isLogin, setIsLogin }: { isLogin?: boolean, s
                             boxShadow: '0 20px 25px -5px rgba(6, 182, 212, 0.4)',
                         },
                     }}
+                    onClick={handleRegister}
                 >
                     Register
                 </Button>

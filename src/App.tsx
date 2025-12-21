@@ -14,29 +14,36 @@ import "@fontsource/poppins/700.css";
 import Register from './components/Auth/Register';
 import Dashboard from './pages/Dashboard';
 
+import { Toaster } from 'react-hot-toast';
+
 function App() {
-    
+
     const router = createBrowserRouter([
         {
             path: "/",
-            element: <Home/>,
-            errorElement: <NotFound/>
+            element: <Home />,
+            errorElement: <NotFound />
         },
         {
             path: "/login",
-            element: <LogIn/>
+            element: <LogIn />
         },
         {
             path: "/register",
-            element: <Register/>
+            element: <Register />
         },
         {
             path: "/dashboard",
-            element: <Dashboard/>
+            element: <Dashboard />
         }
     ]);
 
-    return <RouterProvider router={router} />;
+    return (
+        <>
+            <Toaster position="top-center" reverseOrder={false} />
+            <RouterProvider router={router} />
+        </>
+    );
 }
 
 export default App

@@ -1,5 +1,6 @@
 import EmailIcon from '@mui/icons-material/Email';
 import { Button, Tooltip } from "@mui/material";
+import toast from 'react-hot-toast';
 import Box from '@mui/material/Box';
 import SvgIcon from '@mui/material/SvgIcon';
 import { FirebaseError } from 'firebase/app';
@@ -18,6 +19,7 @@ export default function Register({ isLogin, setIsLogin }: { isLogin?: boolean, s
     const [emailSignUp, setEmailSignUp] = useState('');
     const [passwordSignUp, setPasswordSignUp] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [loading, setLoading] = useState(false);
 
     const togglePassword = () => setShowPassword(prev => !prev);
     const toggleConfirmPassword = () => setShowConfirmPassword(prev => !prev);
@@ -46,24 +48,68 @@ export default function Register({ isLogin, setIsLogin }: { isLogin?: boolean, s
     }
 
 
+
+
+    const validateEmail = (email: string) => {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    };
+
+    const validatePassword = (password: string) => {
+        // At least 6 chars
+        return password.length >= 6;
+    };
+
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (passwordSignUp !== confirmPassword) {
-            console.error("Passwords do not match");
+
+        if (!emailSignUp || !passwordSignUp || !confirmPassword) {
+            toast.error("Please fill in all fields.");
             return;
         }
 
+        if (!validateEmail(emailSignUp)) {
+            toast.error("Please enter a valid email address.");
+            return;
+        }
+
+        if (!validatePassword(passwordSignUp)) {
+            toast.error("Password must be at least 6 characters long.");
+            return;
+        }
+
+        if (passwordSignUp !== confirmPassword) {
+            toast.error("Passwords do not match");
+            return;
+        }
+
+        const loadingToast = toast.loading('Creating account...');
+        setLoading(true);
+
         try {
             await createUserWithEmailAndPassword(auth, emailSignUp, passwordSignUp);
+            toast.dismiss(loadingToast);
+            toast.success("Account created successfully!");
             console.log("Registered Successfully");
             navigate('/dashboard');
         } catch (error: unknown) {
+            toast.dismiss(loadingToast);
             if (error instanceof FirebaseError) {
                 console.error("Registration error:", error.code, error.message);
-                // Handle specific errors
+                if (error.code === 'auth/email-already-in-use') {
+                    toast.error("Email is already in use.");
+                } else if (error.code === 'auth/weak-password') {
+                    toast.error("Password is too weak.");
+                } else if (error.code === 'auth/invalid-email') {
+                    toast.error("Invalid email address.");
+                } else {
+                    toast.error("Registration failed. Please try again.");
+                }
             } else {
                 console.error("Unexpected error:", error);
+                toast.error("An unexpected error occurred.");
             }
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -154,8 +200,10 @@ export default function Register({ isLogin, setIsLogin }: { isLogin?: boolean, s
                         },
                     }}
                     onClick={handleRegister}
+                    disabled={loading}
+                    type="submit"
                 >
-                    Register
+                    {loading ? "Registering..." : "Register"}
                 </Button>
                 <div>
                     <div className="flex items-center h-[20px] mt-[30px] mb-[20px]">

@@ -1,8 +1,9 @@
 import PersonIcon from '@mui/icons-material/Person';
 import { Button, Tooltip } from "@mui/material";
+import toast from 'react-hot-toast';
 import Box from '@mui/material/Box';
 import SvgIcon from '@mui/material/SvgIcon';
-import { signInWithPopup, signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithPopup, signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import { auth, googleProvider } from "../../config/firebase";
 import { FirebaseError } from 'firebase/app';
@@ -14,6 +15,8 @@ export default function LogIn({ isLogin = false, setIsLogin }: { isLogin?: boole
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [resetSent, setResetSent] = useState(false);
 
     const togglePassword = () => setShowPassword(prev => !prev);
 
@@ -31,23 +34,95 @@ export default function LogIn({ isLogin = false, setIsLogin }: { isLogin?: boole
                     console.log("Popup request cancelled, maybe another popup is open.");
                 } else {
                     console.error("Sign-in error:", error);
+                    toast.error("An error occurred during Google Sign In.");
                 }
             }
         }
     }
 
+    const validateEmail = (email: string) => {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    };
+
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!email || !password) {
+            toast.error("Please fill in all fields.");
+            return;
+        }
+
+        if (!validateEmail(email)) {
+            toast.error("Please enter a valid email address.");
+            return;
+        }
+
+        const loadingToast = toast.loading('Logging in...');
+        setLoading(true);
+
         try {
             await signInWithEmailAndPassword(auth, email, password);
+            toast.dismiss(loadingToast);
+            toast.success("Logged In Successfully!");
             console.log("Logged In Successfully");
             navigate('/dashboard');
         } catch (error: unknown) {
+            toast.dismiss(loadingToast);
             if (error instanceof FirebaseError) {
                 console.error("Login error:", error.code, error.message);
-                // Handle specific errors here (e.g., show toast)
+                if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+                    toast.error("Invalid email or password.");
+                } else if (error.code === 'auth/too-many-requests') {
+                    toast.error("Too many failed attempts. Please try again later.");
+                } else {
+                    toast.error("Login failed. Please try again.");
+                }
             } else {
                 console.error("Unexpected error:", error);
+                toast.error("An unexpected error occurred.");
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleForgotPassword = async () => {
+        if (!email) {
+            toast.error("Please enter your email first.");
+            return;
+        }
+
+        if (!validateEmail(email)) {
+            toast.error("Please enter a valid email address.");
+            return;
+        }
+
+        const loadingToast = toast.loading('Sending reset email...');
+
+        try {
+            await sendPasswordResetEmail(auth, email);
+            toast.dismiss(loadingToast);
+            toast.success("Password reset email sent! Check your inbox.");
+            setResetSent(true);
+        } catch (error: unknown) {
+            toast.dismiss(loadingToast);
+            if (error instanceof FirebaseError) {
+                console.error("Reset password error:", error.code, error.message);
+                if (error.code === 'auth/user-not-found') {
+                    // SECURITY: Treat "User Not Found" as success to prevent Email Enumeration.
+                    // Attackers won't know if the email exists or not.
+                    toast.success("Password reset email sent! Check your inbox.");
+                    setResetSent(true);
+                } else if (error.code === 'auth/invalid-email') {
+                    toast.error("Invalid email address.");
+                } else if (error.code === 'auth/too-many-requests') {
+                    toast.error("Too many requests. Please try again later.");
+                } else {
+                    toast.error("Failed to send reset email. Please try again.");
+                }
+            } else {
+                console.error("Unexpected error:", error);
+                toast.error("An unexpected error occurred.");
             }
         }
     };
@@ -99,7 +174,16 @@ export default function LogIn({ isLogin = false, setIsLogin }: { isLogin?: boole
                     </Box>
                 </div>
                 <div className="forgot-link text-right mb-6">
-                    <a href="#" className="text-sm text-cyan-600 hover:text-cyan-700 font-medium no-underline hover:underline transition-all">Forgot Password?</a>
+                    <a
+                        href="#"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            handleForgotPassword();
+                        }}
+                        className="text-sm text-cyan-600 hover:text-cyan-700 font-medium no-underline hover:underline transition-all"
+                    >
+                        Forgot Password?
+                    </a>
                 </div>
                 <Button
                     className="w-full"
@@ -120,8 +204,10 @@ export default function LogIn({ isLogin = false, setIsLogin }: { isLogin?: boole
                         },
                     }}
                     onClick={handleLogin}
+                    disabled={loading}
+                    type="submit"
                 >
-                    LogIn
+                    {loading ? "Logging in..." : "LogIn"}
                 </Button>
                 <div>
                     <div className="flex items-center h-[20px] mt-[30px] mb-[20px]">

@@ -9,9 +9,9 @@ import { auth, googleProvider } from '../../config/firebase';
 import { useState } from 'react';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 
-export default function Register({isLogin} : {isLogin?: boolean}) {
+export default function Register({ isLogin, setIsLogin }: { isLogin?: boolean, setIsLogin?: (isLogin: boolean) => void }) {
     const navigate = useNavigate();
-    
+
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -29,7 +29,7 @@ export default function Register({isLogin} : {isLogin?: boolean}) {
             if (isGoogle) {
                 await signInWithPopup(auth, googleProvider)
             }
-            
+
             console.log("Sign In Clicked");
             navigate('/dashboard');
         } catch (error: unknown) {
@@ -46,16 +46,16 @@ export default function Register({isLogin} : {isLogin?: boolean}) {
             }
         }
     }
-        
+
     return (
-        <div className={`px-5 form-box register absolute w-1/2 h-full bg-white right-0 items-center text-center text-gray-800 z-20 transition-normal delay-[.6s] ease-in-out transition-[visibility_0s_1s] ${isLogin ? 'hidden' : 'flex right-[50%]'}`}>
-            <form action="" className="w-full">
-                <p className="text-2xl font-bold">Sign Up</p>
-                <div className="input-box relative m-[30px]">
-                    <input 
-                        type="text" 
-                        placeholder="Email" 
-                        className="w-full ps-[20px] pe-[50px] py-[13px] rounded border-0 outline-0 bg-white placeholder-gray-400 placeholder:text-xs text-xs" 
+        <div className={`px-5 form-box register absolute w-full md:w-1/2 h-full bg-white md:right-0 flex flex-col justify-center items-center text-center text-gray-800 transition-all duration-700 ease-in-out ${isLogin ? 'translate-x-[100%] opacity-0 z-0 md:hidden' : 'translate-x-0 opacity-100 z-50 md:flex md:right-[50%] md:z-20'}`}>
+            <form action="" className="w-full max-w-sm mx-auto">
+                <p className="text-4xl font-extrabold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-cyan-500 pb-1">Sign Up</p>
+                <div className="input-box relative my-4">
+                    <input
+                        type="text"
+                        placeholder="Email"
+                        className="w-full ps-[20px] pe-[50px] py-[15px] rounded-xl border-0 outline-none bg-gray-50 focus:bg-white focus:ring-2 focus:ring-cyan-400 transition-all shadow-sm placeholder-gray-400 text-sm"
                     />
                     <EmailIcon
                         sx={{
@@ -69,11 +69,11 @@ export default function Register({isLogin} : {isLogin?: boolean}) {
                         <EmailIcon fontSize="small" />
                     </EmailIcon>
                 </div>
-                <div className="input-box relative m-[30px]">
-                    <input 
+                <div className="input-box relative my-4">
+                    <input
                         type={showPassword ? "text" : "password"}
-                        placeholder="Password" 
-                        className="w-full ps-[20px] pe-[50px] py-[13px] rounded border-0 outline-0 bg-white placeholder-gray-400 placeholder:text-xs text-xs" 
+                        placeholder="Password"
+                        className="w-full ps-[20px] pe-[50px] py-[15px] rounded-xl border-0 outline-none bg-gray-50 focus:bg-white focus:ring-2 focus:ring-cyan-400 transition-all shadow-sm placeholder-gray-400 text-sm"
                     />
                     <Box
                         onClick={togglePassword}
@@ -86,14 +86,14 @@ export default function Register({isLogin} : {isLogin?: boolean}) {
                             color: 'gray'
                         }}
                     >
-                        {showPassword ? <Visibility/> : <VisibilityOff/>}
+                        {showPassword ? <Visibility /> : <VisibilityOff />}
                     </Box>
                 </div>
-                <div className="input-box relative m-[30px]">
-                    <input 
+                <div className="input-box relative my-4">
+                    <input
                         type={showConfirmPassword ? "text" : "password"}
-                        placeholder="Confirm Password" 
-                        className="w-full ps-[20px] pe-[50px] py-[13px] rounded border-0 outline-0 bg-white placeholder-gray-400 placeholder:text-xs text-xs" 
+                        placeholder="Confirm Password"
+                        className="w-full ps-[20px] pe-[50px] py-[15px] rounded-xl border-0 outline-none bg-gray-50 focus:bg-white focus:ring-2 focus:ring-cyan-400 transition-all shadow-sm placeholder-gray-400 text-sm"
                     />
                     <Box
                         onClick={toggleConfirmPassword}
@@ -106,25 +106,35 @@ export default function Register({isLogin} : {isLogin?: boolean}) {
                             color: 'gray'
                         }}
                     >
-                        {showConfirmPassword ? <Visibility/> : <VisibilityOff/>}
+                        {showConfirmPassword ? <Visibility /> : <VisibilityOff />}
                     </Box>
                 </div>
                 <Button
                     className="w-full"
                     variant="contained"
                     sx={{
-                        backgroundColor: 'var(--color-blue-400)',
+                        background: 'linear-gradient(to right, #3B82F6, #06B6D4)',
                         width: '100%',
-                        mt: 2,
+                        borderRadius: '12px',
+                        padding: '12px',
+                        textTransform: 'none',
+                        fontSize: '1rem',
+                        fontWeight: 'bold',
+                        boxShadow: '0 10px 15px -3px rgba(6, 182, 212, 0.3)',
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                            transform: 'scale(1.02)',
+                            boxShadow: '0 20px 25px -5px rgba(6, 182, 212, 0.4)',
+                        },
                     }}
                 >
                     Register
                 </Button>
                 <div>
-                    <div className="flex items-center h-[20px] mt-[24px] mb-[16px]">
-                        <div className="flex-1 h-[1px] bg-gray-400"></div>
-                        <span className="mx-[8px] text-xs text-gray-400">or</span>
-                        <div className="flex-1 h-[1px] bg-gray-400"></div>
+                    <div className="flex items-center h-[20px] mt-[30px] mb-[20px]">
+                        <div className="flex-1 h-[1px] bg-gray-200"></div>
+                        <span className="mx-[12px] text-xs text-gray-400 font-medium">OR CONTINUE WITH</span>
+                        <div className="flex-1 h-[1px] bg-gray-200"></div>
                     </div>
                     <div className="mt-[10px] flex items-center justify-center gap-[15px]">
                         <Tooltip title="Sign in with Google">
@@ -133,20 +143,20 @@ export default function Register({isLogin} : {isLogin?: boolean}) {
                                     display: 'flex',
                                     justifyContent: 'center',
                                     alignItems: 'center',
-                                    width: 15,
-                                    height: 15,
-                                    border: '1px solid #ddd',
-                                    padding: 2,
+                                    width: 50,
+                                    height: 50,
                                     borderRadius: '50%',
                                     backgroundColor: '#fff',
-                                    boxShadow: 1,
+                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                    border: '1px solid #f3f4f6',
                                     cursor: 'pointer',
-                                    transition: 'all 0.3s ease',
+                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                                     '&:hover': {
-                                        transform: 'scale(1.1)',    
+                                        transform: 'translateY(-2px)',
+                                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
                                     },
                                 }}
-                                onClick={signIn}
+                                onClick={() => signIn(true)}
                             >
                                 <SvgIcon viewBox="0 0 48 48">
                                     <path fill="#4285F4" d="M24 9.5c3.29 0 6.01 1.36 7.99 3.57l5.43-5.43C33.89 4.15 29.29 2 24 2 14.61 2 6.65 7.74 3.65 16.01l6.32 4.91C11.5 14.03 17.29 9.5 24 9.5z" />
@@ -157,6 +167,9 @@ export default function Register({isLogin} : {isLogin?: boolean}) {
                             </Box>
                         </Tooltip>
                     </div>
+                </div>
+                <div className="md:hidden mt-8 text-sm text-gray-500">
+                    <p>Already have an account? <span className="text-cyan-600 font-bold cursor-pointer hover:underline" onClick={() => setIsLogin && setIsLogin(true)}>Login</span></p>
                 </div>
             </form>
         </div>

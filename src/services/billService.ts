@@ -25,6 +25,8 @@ export interface Bill {
     frequency: 'once' | 'daily' | 'weekly' | 'biweekly' | 'monthly';
     walletId?: string; // For automatic deduction
     autoDeduct: boolean; // Enable automatic deduction
+    lastGeneratedDueDate?: Date | Timestamp; // Track last generation for recurring bills
+    parentBillId?: string; // ID of the parent bill layout for recurring instances
     createdAt: Timestamp;
 }
 

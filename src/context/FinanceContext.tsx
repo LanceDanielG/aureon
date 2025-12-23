@@ -208,9 +208,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }, []);
 
     // Auto-process due bills when data is loaded
+    const isProcessingBills = React.useRef(false);
+
     useEffect(() => {
         const processAutoBills = async () => {
-            if (!auth.currentUser || loading || bills.length === 0 || wallets.length === 0) {
+            if (!auth.currentUser || loading || bills.length === 0 || wallets.length === 0 || isProcessingBills.current) {
                 return;
             }
 
@@ -222,6 +224,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             }
 
             try {
+                isProcessingBills.current = true;
                 const result = await processDueBills(bills, wallets, auth.currentUser.uid, exchangeRates);
 
                 if (result.processed > 0 || result.recurring > 0) {
@@ -232,6 +235,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 showBillNotifications(bills);
             } catch (error) {
                 console.error("Error processing bills:", error);
+            } finally {
+                // Add a small delay before allowing next run to let Firebase updates settle
+                setTimeout(() => {
+                    isProcessingBills.current = false;
+                }, 2000);
             }
         };
 

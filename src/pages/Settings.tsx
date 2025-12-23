@@ -1,16 +1,25 @@
 import MainLayout from "../components/Layout/MainLayout";
 import PageHeader from "../components/Common/PageHeader";
 import { Box, Typography, Card, CardContent, Switch, List, ListItem, ListItemIcon, ListItemText, Divider, Button, Avatar } from "@mui/material";
-import { Notifications, Security, Person, DarkMode, Language, ChevronRight } from "@mui/icons-material";
+import { Notifications, Security, Person, DarkMode, Language, ChevronRight, Logout } from "@mui/icons-material";
 import { auth } from "../config/firebase";
 import { useThemeContext } from "../context/ThemeContext";
 import { useFinance } from "../context/FinanceContext";
 import { MenuItem, Select, FormControl } from "@mui/material";
 import { currencyService, type Currency } from "../services/currencyService";
+import { getNotificationPreference, setNotificationPreference } from "../services/notificationService";
+import { useState } from "react";
 
 export default function Settings() {
     const { mode, toggleTheme } = useThemeContext();
     const { baseCurrency, setBaseCurrency, availableCurrencies } = useFinance();
+    const [notificationsEnabled, setNotificationsEnabled] = useState(getNotificationPreference());
+
+    const handleNotificationToggle = () => {
+        const newValue = !notificationsEnabled;
+        setNotificationsEnabled(newValue);
+        setNotificationPreference(newValue);
+    };
 
     return (
         <MainLayout>
@@ -56,8 +65,12 @@ export default function Settings() {
                             <Divider component="li" />
                             <ListItem sx={{ py: 2, px: 3 }}>
                                 <ListItemIcon sx={{ color: 'text.secondary' }}><Notifications /></ListItemIcon>
-                                <ListItemText primary="Notifications" secondary="Manage email and push notifications" />
-                                <Switch defaultChecked color="info" />
+                                <ListItemText primary="Bill Notifications" secondary="Get alerts for overdue and upcoming bills" />
+                                <Switch
+                                    checked={notificationsEnabled}
+                                    onChange={handleNotificationToggle}
+                                    color="info"
+                                />
                             </ListItem>
                             <Divider component="li" />
                             <ListItem sx={{ py: 2, px: 3 }}>
@@ -86,6 +99,28 @@ export default function Settings() {
                                         ))}
                                     </Select>
                                 </FormControl>
+                            </ListItem>
+                            <Divider component="li" />
+                            <ListItem
+                                sx={{
+                                    py: 2,
+                                    px: 3,
+                                    cursor: 'pointer',
+                                    '&:hover': { bgcolor: 'action.hover' },
+                                    display: { xs: 'flex', md: 'none' } // Only show on mobile
+                                }}
+                                onClick={async () => {
+                                    await auth.signOut();
+                                    window.location.href = '/';
+                                }}
+                            >
+                                <ListItemIcon sx={{ color: 'error.main' }}><Logout /></ListItemIcon>
+                                <ListItemText
+                                    primary="Logout"
+                                    secondary="Sign out of your account"
+                                    primaryTypographyProps={{ color: 'error.main' }}
+                                />
+                                <ChevronRight sx={{ color: 'divider' }} />
                             </ListItem>
                         </List>
                     </CardContent>

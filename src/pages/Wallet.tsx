@@ -11,7 +11,7 @@ import {
 import { Add, AccountBalance, Payments, CheckCircle } from "@mui/icons-material";
 import { useFinance } from "../context/FinanceContext";
 import { walletService } from "../services/walletService";
-import { billService } from "../services/billService";
+import { billService, type Bill } from "../services/billService";
 import { transactionService } from "../services/transactionService";
 import { auth } from "../config/firebase";
 import { toast } from "react-hot-toast";
@@ -24,7 +24,16 @@ export default function Wallet() {
     const [submitting, setSubmitting] = useState(false);
 
     const [newWallet, setNewWallet] = useState({ name: '', balance: '', icon: 'AccountBalance', currency: 'USD' as Currency });
-    const [newBill, setNewBill] = useState({ title: '', amount: '', dueDate: '', category: 'Utility', currency: 'USD' as Currency });
+    const [newBill, setNewBill] = useState({
+        title: '',
+        amount: '',
+        dueDate: '',
+        category: 'Utility',
+        currency: 'USD' as Currency,
+        frequency: 'monthly' as Bill['frequency'],
+        walletId: '',
+        autoDeduct: false
+    });
 
     const handleAddWallet = async () => {
         if (!auth.currentUser || submitting) return;
@@ -70,11 +79,13 @@ export default function Wallet() {
                 dueDate: new Date(newBill.dueDate),
                 category: newBill.category,
                 isPaid: false,
-                frequency: 'monthly'
+                frequency: newBill.frequency,
+                walletId: newBill.walletId || undefined,
+                autoDeduct: newBill.autoDeduct
             });
             toast.success("Bill scheduled!");
             setBillOpen(false);
-            setNewBill({ title: '', amount: '', dueDate: '', category: 'Utility', currency: 'USD' });
+            setNewBill({ title: '', amount: '', dueDate: '', category: 'Utility', currency: 'USD', frequency: 'monthly', walletId: '', autoDeduct: false });
         } catch {
             toast.error("Failed to schedule bill");
         } finally {
@@ -90,21 +101,40 @@ export default function Wallet() {
 
         setSubmitting(true);
         try {
+            // Get the wallet (default to first wallet)
+            const wallet = wallets[0];
+            if (!wallet) throw new Error("Wallet not found");
+
+            const walletCurrency = wallet.currency || 'USD';
+            let billAmount = amount;
+
+            // Convert bill amount to wallet currency if needed
+            if (currency !== walletCurrency) {
+                const amountUSD = currencyService.convertToUSD(amount, currency, exchangeRates);
+                billAmount = currencyService.convertFromUSD(amountUSD, walletCurrency, exchangeRates);
+            }
+
+            // Check if wallet has sufficient balance
+            if (wallet.balance < billAmount) {
+                toast.error(
+                    `Insufficient balance in ${wallet.name}. Available: ${currencyService.format(wallet.balance, walletCurrency)}, Need: ${currencyService.format(billAmount, walletCurrency)}`
+                );
+                setSubmitting(false);
+                return;
+            }
+
             // 1. Mark bill as paid
             await billService.updateBill(billId, { isPaid: true });
 
             // 2. Create transaction
-            const wallet = wallets[0]; // Default to first wallet
-            if (!wallet) throw new Error("Wallet not found");
-
             await transactionService.addTransactionWithWallet({
                 userId: auth.currentUser.uid,
                 title: `Paid: ${title}`,
                 subtitle: "Automated Bill Payment",
-                amount: -amount,
+                amount: -billAmount,
                 flow: 'expense',
                 categoryId: 'bills',
-                currency: currency,
+                currency: walletCurrency,
                 date: new Date(),
                 walletId: wallet.id
             }, exchangeRates);
@@ -215,17 +245,33 @@ export default function Wallet() {
                                     <Box key={bill.id}>
                                         <ListItem
                                             secondaryAction={
-                                                !bill.isPaid ? (
-                                                    <Button
-                                                        size="small"
-                                                        variant="contained"
-                                                        onClick={() => handlePayBill(bill.id!, bill.amount, bill.currency || 'USD', bill.title)}
-                                                        disabled={submitting}
-                                                        sx={{ bgcolor: '#06b6d4' }}
-                                                    >
-                                                        Pay
-                                                    </Button>
-                                                ) : <Chip icon={<CheckCircle />} label="Paid" color="success" size="small" variant="outlined" />
+                                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
+                                                    {bill.isPaid ? (
+                                                        <Chip icon={<CheckCircle />} label="Paid" color="success" size="small" variant="outlined" />
+                                                    ) : ((() => {
+                                                        const billDate = new Date(bill.dueDate);
+                                                        const today = new Date();
+                                                        today.setHours(0, 0, 0, 0);
+                                                        billDate.setHours(0, 0, 0, 0);
+                                                        return billDate < today;
+                                                    })()) ? (
+                                                        <Chip label="Overdue" color="error" size="small" variant="outlined" />
+                                                    ) : (
+                                                        <Chip label="Pending" color="warning" size="small" variant="outlined" />
+                                                    )}
+
+                                                    {!bill.isPaid && (
+                                                        <Button
+                                                            size="small"
+                                                            variant="contained"
+                                                            onClick={() => handlePayBill(bill.id!, bill.amount, bill.currency || 'USD', bill.title)}
+                                                            disabled={submitting}
+                                                            sx={{ bgcolor: '#06b6d4' }}
+                                                        >
+                                                            Pay
+                                                        </Button>
+                                                    )}
+                                                </Box>
                                             }
                                         >
                                             <ListItemText
@@ -330,6 +376,47 @@ export default function Wallet() {
                             value={newBill.dueDate}
                             onChange={(e) => setNewBill({ ...newBill, dueDate: e.target.value })}
                         />
+                        <FormControl fullWidth>
+                            <InputLabel>Frequency</InputLabel>
+                            <Select
+                                value={newBill.frequency}
+                                label="Frequency"
+                                onChange={(e) => setNewBill({ ...newBill, frequency: e.target.value as Bill['frequency'] })}
+                            >
+                                <MenuItem value="once">One-time</MenuItem>
+                                <MenuItem value="daily">Daily</MenuItem>
+                                <MenuItem value="weekly">Weekly</MenuItem>
+                                <MenuItem value="biweekly">Bi-weekly (Every 15 days)</MenuItem>
+                                <MenuItem value="monthly">Monthly</MenuItem>
+                            </Select>
+                        </FormControl>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <FormControl fullWidth>
+                                <InputLabel>Auto-Deduct Wallet (Optional)</InputLabel>
+                                <Select
+                                    value={newBill.walletId}
+                                    label="Auto-Deduct Wallet (Optional)"
+                                    onChange={(e) => {
+                                        const walletId = e.target.value;
+                                        setNewBill({
+                                            ...newBill,
+                                            walletId: walletId,
+                                            autoDeduct: walletId ? true : false
+                                        });
+                                    }}
+                                >
+                                    <MenuItem value=""><em>None</em></MenuItem>
+                                    {wallets.map(w => (
+                                        <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Box>
+                        {newBill.walletId && (
+                            <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }}>
+                                Bill will be automatically deducted from {wallets.find(w => w.id === newBill.walletId)?.name} on the due date
+                            </Typography>
+                        )}
                     </Box>
                 </DialogContent>
                 <DialogActions sx={{ p: 3 }}>

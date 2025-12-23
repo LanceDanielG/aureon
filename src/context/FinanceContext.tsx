@@ -14,6 +14,8 @@ import type { Wallet } from "../services/walletService";
 import type { Bill } from "../services/billService";
 import { type Category, categoryService } from "../services/categoryService";
 import { currencyService, type Currency } from "../services/currencyService";
+import { processDueBills, hasDueBills } from "../services/billProcessingService";
+import { showBillNotifications } from "../services/notificationService";
 
 interface FinanceContextType {
     transactions: Transaction[];
@@ -155,8 +157,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                         dueDate: doc.data().dueDate instanceof Timestamp ? doc.data().dueDate.toDate() : new Date(doc.data().dueDate),
                     } as Bill));
 
-                    // Sort by dueDate client-side to avoid index requirement
-                    setBills(fetchedBills.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime()));
+                    // Sort by dueDate descending (latest first)
+                    setBills(fetchedBills.sort((a, b) => b.dueDate.getTime() - a.dueDate.getTime()));
                     setErrors(prev => ({ ...prev, bills: null }));
                 }, (err) => {
                     console.error("FIREBASE ERROR (Bills):", err.message);
@@ -204,6 +206,37 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             unsubCategories();
         };
     }, []);
+
+    // Auto-process due bills when data is loaded
+    useEffect(() => {
+        const processAutoBills = async () => {
+            if (!auth.currentUser || loading || bills.length === 0 || wallets.length === 0) {
+                return;
+            }
+
+            // Check if there are any due bills to process
+            if (!hasDueBills(bills)) {
+                // Even if no bills to process, show notifications for overdue/upcoming
+                showBillNotifications(bills);
+                return;
+            }
+
+            try {
+                const result = await processDueBills(bills, wallets, auth.currentUser.uid, exchangeRates);
+
+                if (result.processed > 0 || result.recurring > 0) {
+                    console.log(`Bill processing complete: ${result.processed} paid, ${result.recurring} recurring created, ${result.failed} failed`);
+                }
+
+                // Show notifications after processing
+                showBillNotifications(bills);
+            } catch (error) {
+                console.error("Error processing bills:", error);
+            }
+        };
+
+        processAutoBills();
+    }, [bills, wallets, loading, exchangeRates]);
 
     useEffect(() => {
         const fetchRatesAndCurrencies = async () => {

@@ -7,7 +7,7 @@ import { FirebaseError } from 'firebase/app';
 import { signInWithPopup, createUserWithEmailAndPassword } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { auth, googleProvider } from '../../config/firebase';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 
 export default function Register({ isLogin, setIsLogin }: { isLogin?: boolean, setIsLogin?: (isLogin: boolean) => void }) {
@@ -20,6 +20,17 @@ export default function Register({ isLogin, setIsLogin }: { isLogin?: boolean, s
     const [passwordSignUp, setPasswordSignUp] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        // Only apply if we are on the /register route specifically
+        if (window.location.pathname === '/register') {
+            const originalColor = document.body.style.backgroundColor;
+            document.body.style.backgroundColor = '#242424';
+            return () => {
+                document.body.style.backgroundColor = originalColor;
+            };
+        }
+    }, []);
 
     const togglePassword = () => setShowPassword(prev => !prev);
     const toggleConfirmPassword = () => setShowConfirmPassword(prev => !prev);
@@ -123,7 +134,8 @@ export default function Register({ isLogin, setIsLogin }: { isLogin?: boolean, s
                         placeholder="Email"
                         value={emailSignUp}
                         onChange={(e) => setEmailSignUp(e.target.value)}
-                        className="w-full ps-[20px] pe-[50px] py-[15px] rounded-xl border-0 outline-none bg-gray-50 focus:bg-white focus:ring-2 focus:ring-cyan-400 transition-all shadow-sm placeholder-gray-400 text-sm"
+                        className="w-full ps-[20px] pe-[50px] py-[15px] rounded-xl border-0 outline-none bg-gray-50 focus:bg-white focus:ring-2 focus:ring-cyan-400 transition-all shadow-sm placeholder-gray-400 text-sm text-gray-800"
+                        required
                     />
                     <EmailIcon
                         sx={{
@@ -143,7 +155,8 @@ export default function Register({ isLogin, setIsLogin }: { isLogin?: boolean, s
                         placeholder="Password"
                         value={passwordSignUp}
                         onChange={(e) => setPasswordSignUp(e.target.value)}
-                        className="w-full ps-[20px] pe-[50px] py-[15px] rounded-xl border-0 outline-none bg-gray-50 focus:bg-white focus:ring-2 focus:ring-cyan-400 transition-all shadow-sm placeholder-gray-400 text-sm"
+                        className="w-full ps-[20px] pe-[50px] py-[15px] rounded-xl border-0 outline-none bg-gray-50 focus:bg-white focus:ring-2 focus:ring-cyan-400 transition-all shadow-sm placeholder-gray-400 text-sm text-gray-800"
+                        required
                     />
                     <Box
                         onClick={togglePassword}
@@ -165,7 +178,8 @@ export default function Register({ isLogin, setIsLogin }: { isLogin?: boolean, s
                         placeholder="Confirm Password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="w-full ps-[20px] pe-[50px] py-[15px] rounded-xl border-0 outline-none bg-gray-50 focus:bg-white focus:ring-2 focus:ring-cyan-400 transition-all shadow-sm placeholder-gray-400 text-sm"
+                        className="w-full ps-[20px] pe-[50px] py-[15px] rounded-xl border-0 outline-none bg-gray-50 focus:bg-white focus:ring-2 focus:ring-cyan-400 transition-all shadow-sm placeholder-gray-400 text-sm text-gray-800"
+                        required
                     />
                     <Box
                         onClick={toggleConfirmPassword}

@@ -17,7 +17,7 @@ export interface Transaction {
     id?: string;
     userId: string;
     walletId?: string; // Associated wallet
-    flow: 'income' | 'expense';
+    flow: 'income' | 'expense' | 'transfer';
     categoryId: string;
     currency: Currency;
     title: string;

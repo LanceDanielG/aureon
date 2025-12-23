@@ -24,6 +24,7 @@ export default function Activity() {
         flow: 'expense' as Transaction['flow'],
         categoryId: '',
         walletId: '',
+        destinationWalletId: '', // For transfers
         currency: 'USD' as Currency
     });
 
@@ -58,10 +59,117 @@ export default function Activity() {
 
         setSubmitting(true);
         try {
+            // Handle wallet-to-wallet transfer
+            if (newTx.flow === 'transfer') {
+                if (!newTx.walletId || !newTx.destinationWalletId) {
+                    toast.error("Please select both source and destination wallets");
+                    setSubmitting(false);
+                    return;
+                }
+
+                if (newTx.walletId === newTx.destinationWalletId) {
+                    toast.error("Source and destination wallets must be different");
+                    setSubmitting(false);
+                    return;
+                }
+
+                const sourceWallet = wallets.find(w => w.id === newTx.walletId);
+                const destWallet = wallets.find(w => w.id === newTx.destinationWalletId);
+
+                if (!sourceWallet || !destWallet) {
+                    toast.error("Selected wallets not found");
+                    setSubmitting(false);
+                    return;
+                }
+
+                const transferAmount = parseFloat(newTx.amount.replace(/[^0-9.]/g, "") || "0");
+                const sourceCurrency = sourceWallet.currency || 'USD';
+                let sourceAmount = transferAmount;
+
+                // Convert to source wallet currency if needed
+                if (newTx.currency !== sourceCurrency) {
+                    const amountUSD = currencyService.convertToUSD(transferAmount, newTx.currency, exchangeRates);
+                    sourceAmount = currencyService.convertFromUSD(amountUSD, sourceCurrency, exchangeRates);
+                }
+
+                // Check source wallet balance
+                if (sourceWallet.balance < sourceAmount) {
+                    toast.error(
+                        `Insufficient balance in ${sourceWallet.name}. Available: ${currencyService.format(sourceWallet.balance, sourceCurrency)}, Need: ${currencyService.format(sourceAmount, sourceCurrency)}`
+                    );
+                    setSubmitting(false);
+                    return;
+                }
+
+                // Create expense transaction from source wallet
+                await transactionService.addTransactionWithWallet({
+                    userId: auth.currentUser.uid,
+                    title: `Transfer to ${destWallet.name}`,
+                    subtitle: newTx.subtitle || 'Wallet Transfer',
+                    amount: -sourceAmount,
+                    flow: 'expense',
+                    categoryId: newTx.categoryId || 'transfer',
+                    currency: sourceCurrency,
+                    date: new Date(),
+                    walletId: newTx.walletId
+                }, exchangeRates);
+
+                // Create income transaction to destination wallet
+                const destCurrency = destWallet.currency || 'USD';
+                let destAmount = transferAmount;
+
+                // Convert to destination wallet currency if needed
+                if (newTx.currency !== destCurrency) {
+                    const amountUSD = currencyService.convertToUSD(transferAmount, newTx.currency, exchangeRates);
+                    destAmount = currencyService.convertFromUSD(amountUSD, destCurrency, exchangeRates);
+                }
+
+                await transactionService.addTransactionWithWallet({
+                    userId: auth.currentUser.uid,
+                    title: `Transfer from ${sourceWallet.name}`,
+                    subtitle: newTx.subtitle || 'Wallet Transfer',
+                    amount: destAmount,
+                    flow: 'income',
+                    categoryId: newTx.categoryId || 'transfer',
+                    currency: destCurrency,
+                    date: new Date(),
+                    walletId: newTx.destinationWalletId
+                }, exchangeRates);
+
+                toast.success("Transfer completed!");
+                setOpen(false);
+                setNewTx({ title: '', subtitle: '', amount: '', flow: 'expense', categoryId: '', walletId: '', destinationWalletId: '', currency: 'USD' });
+                setSubmitting(false);
+                return;
+            }
+
             // Parse amount and ensure sign matches flow
             let amountValue = Math.abs(parseFloat(newTx.amount.replace(/[^0-9.]/g, "") || "0"));
             if (newTx.flow === 'expense') {
                 amountValue = -amountValue;
+            }
+
+            // Validate wallet balance for expenses
+            if (newTx.flow === 'expense' && newTx.walletId) {
+                const selectedWallet = wallets.find(w => w.id === newTx.walletId);
+                if (selectedWallet) {
+                    const walletCurrency = selectedWallet.currency || 'USD';
+                    let expenseAmount = Math.abs(amountValue);
+
+                    // Convert expense to wallet currency if needed
+                    if (newTx.currency !== walletCurrency) {
+                        const amountUSD = currencyService.convertToUSD(expenseAmount, newTx.currency, exchangeRates);
+                        expenseAmount = currencyService.convertFromUSD(amountUSD, walletCurrency, exchangeRates);
+                    }
+
+                    if (selectedWallet.balance < expenseAmount) {
+                        toast.error(
+                            `Insufficient balance in ${selectedWallet.name}. Available: ${currencyService.format(selectedWallet.balance, walletCurrency)}, Required: ${currencyService.format(expenseAmount, walletCurrency)}`
+                        );
+                        setSubmitting(false);
+                        return;
+                    }
+                }
             }
 
             await transactionService.addTransactionWithWallet({
@@ -78,7 +186,7 @@ export default function Activity() {
 
             toast.success("Transaction recorded!");
             setOpen(false);
-            setNewTx({ title: '', subtitle: '', amount: '', flow: 'expense', categoryId: '', walletId: '', currency: 'USD' });
+            setNewTx({ title: '', subtitle: '', amount: '', flow: 'expense', categoryId: '', walletId: '', destinationWalletId: '', currency: 'USD' });
         } catch {
             toast.error("Failed to add transaction");
         } finally {
@@ -93,7 +201,10 @@ export default function Activity() {
         }
 
         try {
-            await categoryService.addCategory(auth.currentUser!.uid, newCategory);
+            await categoryService.addCategory(auth.currentUser!.uid, {
+                ...newCategory,
+                flow: newCategory.flow === 'transfer' ? 'expense' : newCategory.flow
+            });
             toast.success("Category created!");
             setOpenCategoryDialog(false);
             setNewCategory({ name: '', icon: 'payments', color: '#10b981', bgColor: '#ecfdf5', flow: newCategory.flow });
@@ -239,7 +350,7 @@ export default function Activity() {
                                 value={newTx.flow}
                                 exclusive
                                 onChange={(_, val) => {
-                                    if (val) setNewTx({ ...newTx, flow: val, categoryId: '' });
+                                    if (val) setNewTx({ ...newTx, flow: val, categoryId: '', walletId: '', destinationWalletId: '' });
                                 }}
                                 fullWidth
                                 size="small"
@@ -247,47 +358,79 @@ export default function Activity() {
                             >
                                 <ToggleButton value="income" sx={{ py: 1 }}>Income</ToggleButton>
                                 <ToggleButton value="expense" sx={{ py: 1 }}>Expense</ToggleButton>
+                                <ToggleButton value="transfer" sx={{ py: 1 }}>Transfer</ToggleButton>
                             </ToggleButtonGroup>
                         </Stack>
 
-                        <FormControl fullWidth required>
-                            <InputLabel>Category</InputLabel>
-                            <Select
-                                value={newTx.categoryId}
-                                label="Category"
-                                onChange={(e) => setNewTx({ ...newTx, categoryId: e.target.value })}
-                            >
-                                {categories.filter(c => c.flow === newTx.flow).map(cat => (
-                                    <MenuItem key={cat.id} value={cat.id}>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                            <CategoryIcon category={cat} size="small" />
-                                            {cat.name}
-                                        </Box>
-                                    </MenuItem>
-                                ))}
-                                <Divider />
-                                <MenuItem onClick={() => { setOpenCategoryDialog(true); setNewCategory({ ...newCategory, flow: newTx.flow }); }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#06b6d4' }}>
-                                        <Add fontSize="small" />
-                                        Quick Create Category
-                                    </Box>
-                                </MenuItem>
-                            </Select>
-                        </FormControl>
+                        {newTx.flow === 'transfer' ? (
+                            <>
+                                <FormControl fullWidth required>
+                                    <InputLabel>From Wallet</InputLabel>
+                                    <Select
+                                        value={newTx.walletId}
+                                        label="From Wallet"
+                                        onChange={(e) => setNewTx({ ...newTx, walletId: e.target.value })}
+                                    >
+                                        {wallets.map(w => (
+                                            <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                                <FormControl fullWidth required>
+                                    <InputLabel>To Wallet</InputLabel>
+                                    <Select
+                                        value={newTx.destinationWalletId}
+                                        label="To Wallet"
+                                        onChange={(e) => setNewTx({ ...newTx, destinationWalletId: e.target.value })}
+                                    >
+                                        {wallets.filter(w => w.id !== newTx.walletId).map(w => (
+                                            <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </>
+                        ) : (
+                            <>
+                                <FormControl fullWidth required>
+                                    <InputLabel>Category</InputLabel>
+                                    <Select
+                                        value={newTx.categoryId}
+                                        label="Category"
+                                        onChange={(e) => setNewTx({ ...newTx, categoryId: e.target.value })}
+                                    >
+                                        {categories.filter(c => c.flow === newTx.flow).map(cat => (
+                                            <MenuItem key={cat.id} value={cat.id}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                    <CategoryIcon category={cat} size="small" />
+                                                    {cat.name}
+                                                </Box>
+                                            </MenuItem>
+                                        ))}
+                                        <Divider />
+                                        <MenuItem onClick={() => { setOpenCategoryDialog(true); setNewCategory({ ...newCategory, flow: newTx.flow }); }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#06b6d4' }}>
+                                                <Add fontSize="small" />
+                                                Quick Create Category
+                                            </Box>
+                                        </MenuItem>
+                                    </Select>
+                                </FormControl>
 
-                        <FormControl fullWidth>
-                            <InputLabel>Target Wallet</InputLabel>
-                            <Select
-                                value={newTx.walletId}
-                                label="Target Wallet"
-                                onChange={(e) => setNewTx({ ...newTx, walletId: e.target.value })}
-                            >
-                                <MenuItem value=""><em>None</em></MenuItem>
-                                {wallets.map(w => (
-                                    <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
+                                <FormControl fullWidth>
+                                    <InputLabel>Target Wallet</InputLabel>
+                                    <Select
+                                        value={newTx.walletId}
+                                        label="Target Wallet"
+                                        onChange={(e) => setNewTx({ ...newTx, walletId: e.target.value })}
+                                    >
+                                        <MenuItem value=""><em>None</em></MenuItem>
+                                        {wallets.map(w => (
+                                            <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </>
+                        )}
                     </Box>
                 </DialogContent>
                 <DialogActions sx={{ p: 3 }}>

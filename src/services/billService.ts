@@ -22,7 +22,9 @@ export interface Bill {
     dueDate: Date;
     category: string;
     isPaid: boolean;
-    frequency: 'once' | 'monthly' | 'weekly';
+    frequency: 'once' | 'daily' | 'weekly' | 'biweekly' | 'monthly';
+    walletId?: string; // For automatic deduction
+    autoDeduct: boolean; // Enable automatic deduction
     createdAt: Timestamp;
 }
 

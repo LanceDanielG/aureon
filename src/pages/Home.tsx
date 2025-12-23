@@ -1,10 +1,19 @@
 import { Button } from "@mui/material";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import LogIn from "../components/Auth/LogIn";
 import Register from "../components/Auth/Register";
 
 export default function Home() {
     const [isLogin, setIsLogin] = useState(true);
+
+    useEffect(() => {
+        const originalColor = document.body.style.backgroundColor;
+        document.body.style.backgroundColor = '#242424';
+
+        return () => {
+            document.body.style.backgroundColor = originalColor;
+        };
+    }, []);
 
     return (
         <div className={`relative w-full h-screen md:h-[550px] md:w-full md:max-w-[850px] bg-white md:rounded-2xl md:shadow-2xl overflow-hidden font-poppins`}>

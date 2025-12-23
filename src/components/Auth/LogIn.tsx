@@ -7,7 +7,7 @@ import { signInWithPopup, signInWithEmailAndPassword, sendPasswordResetEmail } f
 import { useNavigate } from "react-router-dom";
 import { auth, googleProvider } from "../../config/firebase";
 import { FirebaseError } from 'firebase/app';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 
 export default function LogIn({ isLogin = false, setIsLogin }: { isLogin?: boolean, setIsLogin?: (isLogin: boolean) => void }) {
@@ -16,7 +16,17 @@ export default function LogIn({ isLogin = false, setIsLogin }: { isLogin?: boole
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
-    const [resetSent, setResetSent] = useState(false);
+
+    useEffect(() => {
+        // Only apply if we are on the /login route specifically
+        if (window.location.pathname === '/login') {
+            const originalColor = document.body.style.backgroundColor;
+            document.body.style.backgroundColor = '#242424';
+            return () => {
+                document.body.style.backgroundColor = originalColor;
+            };
+        }
+    }, []);
 
     const togglePassword = () => setShowPassword(prev => !prev);
 
@@ -103,7 +113,6 @@ export default function LogIn({ isLogin = false, setIsLogin }: { isLogin?: boole
             await sendPasswordResetEmail(auth, email);
             toast.dismiss(loadingToast);
             toast.success("Password reset email sent! Check your inbox.");
-            setResetSent(true);
         } catch (error: unknown) {
             toast.dismiss(loadingToast);
             if (error instanceof FirebaseError) {
@@ -112,7 +121,6 @@ export default function LogIn({ isLogin = false, setIsLogin }: { isLogin?: boole
                     // SECURITY: Treat "User Not Found" as success to prevent Email Enumeration.
                     // Attackers won't know if the email exists or not.
                     toast.success("Password reset email sent! Check your inbox.");
-                    setResetSent(true);
                 } else if (error.code === 'auth/invalid-email') {
                     toast.error("Invalid email address.");
                 } else if (error.code === 'auth/too-many-requests') {
@@ -137,7 +145,8 @@ export default function LogIn({ isLogin = false, setIsLogin }: { isLogin?: boole
                         placeholder="Email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full ps-[20px] pe-[50px] py-[15px] rounded-xl border-0 outline-none bg-gray-50 focus:bg-white focus:ring-2 focus:ring-cyan-400 transition-all shadow-sm placeholder-gray-400 text-sm"
+                        className="w-full ps-[20px] pe-[50px] py-[15px] rounded-xl border-0 outline-none bg-gray-50 focus:bg-white focus:ring-2 focus:ring-cyan-400 transition-all shadow-sm placeholder-gray-400 text-sm text-gray-800"
+                        required
                     />
                     <Box
                         sx={{
@@ -157,7 +166,8 @@ export default function LogIn({ isLogin = false, setIsLogin }: { isLogin?: boole
                         placeholder="Password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="w-full ps-[20px] pe-[50px] py-[15px] rounded-xl border-0 outline-none bg-gray-50 focus:bg-white focus:ring-2 focus:ring-cyan-400 transition-all shadow-sm placeholder-gray-400 text-sm"
+                        className="w-full ps-[20px] pe-[50px] py-[15px] rounded-xl border-0 outline-none bg-gray-50 focus:bg-white focus:ring-2 focus:ring-cyan-400 transition-all shadow-sm placeholder-gray-400 text-sm text-gray-800"
+                        required
                     />
                     <Box
                         onClick={togglePassword}

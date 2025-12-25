@@ -11,8 +11,21 @@ import { CallReceived, CallMade, TrendingUp } from "@mui/icons-material";
 import { currencyService } from "../services/currencyService";
 import { getMaterialIcon } from "../components/Common/CategoryIcon";
 
+import { ToggleButton, ToggleButtonGroup } from "@mui/material";
+
 export default function Dashboard() {
-    const { transactions, bills, categories, loading, errors, stats, baseCurrency, exchangeRates } = useFinance();
+    const {
+        transactions,
+        bills,
+        categories,
+        loading,
+        errors,
+        stats,
+        baseCurrency,
+        exchangeRates,
+        dashboardTimeframe,
+        setDashboardTimeframe
+    } = useFinance();
     const navigate = useNavigate();
     const recentTransactions = transactions.slice(0, 3);
     const upcomingBills = bills.filter(b => !b.isPaid).slice(0, 3);
@@ -22,6 +35,20 @@ export default function Dashboard() {
             <PageHeader
                 title={`Welcome back, ${auth?.currentUser?.displayName || 'User'}!`}
                 subtitle="Here's what's happening with your portfolio today."
+                action={
+                    <ToggleButtonGroup
+                        value={dashboardTimeframe}
+                        exclusive
+                        onChange={(_, val) => val && setDashboardTimeframe(val)}
+                        size="small"
+                        sx={{ bgcolor: 'background.paper' }}
+                    >
+                        <ToggleButton value="daily">Daily</ToggleButton>
+                        <ToggleButton value="weekly">Weekly</ToggleButton>
+                        <ToggleButton value="monthly">Monthly</ToggleButton>
+                        <ToggleButton value="yearly">Yearly</ToggleButton>
+                    </ToggleButtonGroup>
+                }
             />
 
             <Grid container spacing={3}>
@@ -34,10 +61,14 @@ export default function Dashboard() {
                         </Typography>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: 'rgba(255,255,255,0.2)', px: 1.5, py: 0.5, borderRadius: '8px' }}>
-                                <TrendingUp sx={{ mr: 0.5, fontSize: 18 }} />
-                                <Typography variant="body2">+12.5%</Typography>
+                                <TrendingUp sx={{ mr: 0.5, fontSize: 18, transform: stats.incomeChange < 0 ? 'rotate(180deg)' : 'none' }} />
+                                <Typography variant="body2">
+                                    {stats.incomeChange > 0 ? '+' : ''}{stats.incomeChange.toFixed(1)}%
+                                </Typography>
                             </Box>
-                            <Typography variant="body2" sx={{ opacity: 0.8 }}>vs last month</Typography>
+                            <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                                income vs last {dashboardTimeframe === 'daily' ? 'day' : dashboardTimeframe.replace('ly', '')}
+                            </Typography>
                         </Box>
                     </GradientCard>
                 </Grid>

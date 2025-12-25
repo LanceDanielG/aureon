@@ -2,8 +2,8 @@ import { useState } from "react";
 import MainLayout from "../components/Layout/MainLayout";
 import PageHeader from "../components/Common/PageHeader";
 import TransactionItem from "../components/Common/TransactionItem";
-import { Card, CardContent, Typography, Box, Button, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Stack, ToggleButton, ToggleButtonGroup, FormControl, InputLabel, Select, MenuItem, Divider, List } from "@mui/material";
-import { Add, CallReceived, CallMade, Category as CategoryIconMD } from "@mui/icons-material";
+import { Card, CardContent, Typography, Box, Button, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Stack, ToggleButton, ToggleButtonGroup, FormControl, InputLabel, Select, MenuItem, Divider, List, useTheme, useMediaQuery, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Avatar, TablePagination } from "@mui/material";
+import { Add, CallReceived, CallMade, Category as CategoryIconMD, Download } from "@mui/icons-material";
 import { transactionService, type Transaction } from "../services/transactionService";
 import { auth } from "../config/firebase";
 import { toast } from "react-hot-toast";
@@ -12,9 +12,11 @@ import { currencyService, type Currency } from "../services/currencyService";
 import { categoryService, findSuggestion } from "../services/categoryService";
 import { useEffect as useStandardEffect } from "react";
 import CategoryIcon, { getMaterialIcon } from "../components/Common/CategoryIcon";
+import ExportDialog from "../components/Common/ExportDialog";
+
 
 export default function Activity() {
-    const { transactions, wallets, categories, loading, errors, availableCurrencies, exchangeRates, baseCurrency } = useFinance();
+    const { transactions, wallets, categories, loading, errors, availableCurrencies, exchangeRates, baseCurrency, loadMoreTransactions, hasMoreTransactions } = useFinance();
     const [open, setOpen] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [newTx, setNewTx] = useState({
@@ -36,6 +38,79 @@ export default function Activity() {
         bgColor: '#ecfdf5',
         flow: 'expense' as Transaction['flow']
     });
+
+    const [visibleTx, setVisibleTx] = useState(5);
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+    // Filters
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filterCategory, setFilterCategory] = useState('all');
+    const [filterType, setFilterType] = useState('all');
+
+    const filteredTransactions = transactions.filter(tx => {
+        const category = categories.find(c => c.id === tx.categoryId);
+        const matchesSearch = tx.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (tx.subtitle || '').toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesCategory = filterCategory === 'all' || tx.categoryId === filterCategory || (category?.name === filterCategory);
+        const matchesType = filterType === 'all' || tx.flow === filterType;
+
+        return matchesSearch && matchesCategory && matchesType;
+    });
+
+    const displayedTransactions = isMobile ? filteredTransactions.slice(0, visibleTx) : filteredTransactions;
+
+    // Pagination for desktop table
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
+
+    const handleChangePage = (_: unknown, newPage: number) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
+    };
+
+    const paginatedTransactions = !isMobile ? filteredTransactions.slice(page * rowsPerPage, (page + 1) * rowsPerPage) : [];
+
+    const [exportDialogOpen, setExportDialogOpen] = useState(false);
+
+    const handleExport = async (options: import('../components/Common/ExportDialog').ExportOptions) => {
+        const { exportService } = await import('../services/exportService');
+
+        // Filter transactions based on options
+        const filtered = transactions.filter(tx => {
+            const txDate = new Date(tx.date);
+            const start = new Date(options.startDate);
+            const end = new Date(options.endDate);
+            // Set end date to end of day
+            end.setHours(23, 59, 59, 999);
+
+            const matchesDate = txDate >= start && txDate <= end;
+            const matchesCategory = options.category === 'all' || tx.subtitle === options.category || (categories.find(c => c.id === tx.categoryId)?.name === options.category);
+
+            const matchesType = options.type === 'all' || tx.flow === options.type;
+
+            const matchesSearch = !options.search ||
+                tx.title.toLowerCase().includes(options.search.toLowerCase()) ||
+                (tx.subtitle && tx.subtitle.toLowerCase().includes(options.search.toLowerCase()));
+
+            return matchesDate && matchesCategory && matchesType && matchesSearch;
+        });
+
+        if (options.format === 'pdf') {
+            exportService.exportTransactionsToPDF(filtered, {
+                dateRange: { start: new Date(options.startDate), end: new Date(options.endDate) },
+                category: options.category,
+                type: options.type,
+                search: options.search
+            });
+        } else {
+            exportService.exportTransactionsToExcel(filtered);
+        }
+    };
 
     // Smart Suggest Logic
     useStandardEffect(() => {
@@ -243,8 +318,54 @@ export default function Activity() {
 
             <Card sx={{ borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
                 <CardContent>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', lg: 'center' }, gap: 2, mb: 3 }}>
                         <Typography variant="h6">Transactions</Typography>
+
+                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', width: { xs: '100%', lg: 'auto' } }}>
+                            <TextField
+                                placeholder="Search title or subtitle..."
+                                size="small"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                sx={{ bgcolor: 'background.paper', borderRadius: 1, minWidth: { xs: '100%', sm: 250 } }}
+                            />
+
+                            <FormControl size="small" sx={{ minWidth: 150, bgcolor: 'background.paper', borderRadius: 1 }}>
+                                <Select
+                                    value={filterCategory}
+                                    onChange={(e) => setFilterCategory(e.target.value)}
+                                    displayEmpty
+                                >
+                                    <MenuItem value="all">All Categories</MenuItem>
+                                    {categories.map(cat => (
+                                        <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+
+                            <FormControl size="small" sx={{ minWidth: 120, bgcolor: 'background.paper', borderRadius: 1 }}>
+                                <Select
+                                    value={filterType}
+                                    onChange={(e) => setFilterType(e.target.value)}
+                                    displayEmpty
+                                >
+                                    <MenuItem value="all">All Types</MenuItem>
+                                    <MenuItem value="income">Income</MenuItem>
+                                    <MenuItem value="expense">Expense</MenuItem>
+                                    <MenuItem value="transfer">Transfer</MenuItem>
+                                </Select>
+                            </FormControl>
+
+                            <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => setExportDialogOpen(true)}
+                                startIcon={<Download sx={{ fontSize: 16 }} />}
+                                sx={{ borderRadius: 2, textTransform: 'none', borderColor: '#06b6d4', color: '#06b6d4', height: 40 }}
+                            >
+                                Export Report
+                            </Button>
+                        </Box>
                     </Box>
 
                     {loading ? (
@@ -265,37 +386,165 @@ export default function Activity() {
                             No transactions found.
                         </Typography>
                     ) : (
-                        <List sx={{ width: '100%', bgcolor: 'background.paper' }}>
-                            {transactions.map((item, index) => {
-                                const category = categories.find(c => c.id === item.categoryId);
+                        <Box>
+                            {isMobile ? (
+                                <List sx={{ width: '100%', bgcolor: 'background.paper' }}>
+                                    {displayedTransactions.map((item, index) => {
+                                        const category = categories.find(c => c.id === item.categoryId);
 
-                                return (
-                                    <TransactionItem
-                                        key={item.id}
-                                        title={item.title}
-                                        subtitle={item.subtitle || category?.name || 'General'}
-                                        amount={(() => {
-                                            const num = typeof item.amount === 'number' ? item.amount : parseFloat(String(item.amount).replace(/[^0-9.-]+/g, "") || "0");
-                                            const formatted = currencyService.format(Math.abs(num), item.currency || 'USD');
-                                            return num > 0 ? `+${formatted}` : `-${formatted}`;
-                                        })()}
-                                        secondaryAmount={(() => {
-                                            const baseCur = baseCurrency || 'USD';
-                                            if (item.currency === baseCur) return undefined;
-                                            const num = typeof item.amount === 'number' ? item.amount : parseFloat(String(item.amount).replace(/[^0-9.-]+/g, "") || "0");
-                                            const amountUSD = currencyService.convertToUSD(Math.abs(num), item.currency || 'USD', exchangeRates);
-                                            const amountBase = currencyService.convertFromUSD(amountUSD, baseCur, exchangeRates);
-                                            return currencyService.format(amountBase, baseCur);
-                                        })()}
-                                        date={item.date.toLocaleDateString()}
-                                        icon={category ? getMaterialIcon(category.icon) : (item.flow === 'income' ? <CallReceived /> : <CallMade />)}
-                                        iconColor={category?.color || (item.flow === 'income' ? '#10b981' : '#ef4444')}
-                                        iconBgColor={category?.bgColor || (item.flow === 'income' ? '#ecfdf5' : '#fef2f2')}
-                                        isLast={index === transactions.length - 1}
+                                        return (
+                                            <TransactionItem
+                                                key={item.id}
+                                                title={item.title}
+                                                subtitle={item.subtitle || category?.name || 'General'}
+                                                amount={(() => {
+                                                    const num = typeof item.amount === 'number' ? item.amount : parseFloat(String(item.amount).replace(/[^0-9.-]+/g, "") || "0");
+                                                    const formatted = currencyService.format(Math.abs(num), item.currency || 'USD');
+                                                    return num > 0 ? `+${formatted}` : `-${formatted}`;
+                                                })()}
+                                                secondaryAmount={(() => {
+                                                    const baseCur = baseCurrency || 'USD';
+                                                    if (item.currency === baseCur) return undefined;
+                                                    const num = typeof item.amount === 'number' ? item.amount : parseFloat(String(item.amount).replace(/[^0-9.-]+/g, "") || "0");
+                                                    const amountUSD = currencyService.convertToUSD(Math.abs(num), item.currency || 'USD', exchangeRates);
+                                                    const amountBase = currencyService.convertFromUSD(amountUSD, baseCur, exchangeRates);
+                                                    return currencyService.format(amountBase, baseCur);
+                                                })()}
+                                                date={item.date.toLocaleDateString()}
+                                                icon={category ? getMaterialIcon(category.icon) : (item.flow === 'income' ? <CallReceived /> : <CallMade />)}
+                                                iconColor={category?.color || (item.flow === 'income' ? '#10b981' : '#ef4444')}
+                                                iconBgColor={category?.bgColor || (item.flow === 'income' ? '#ecfdf5' : '#fef2f2')}
+                                                isLast={index === displayedTransactions.length - 1}
+                                            />
+                                        );
+                                    })}
+                                </List>
+                            ) : (
+                                <Box>
+                                    <TableContainer component={Paper} elevation={0}>
+                                        <Table sx={{ minWidth: 650 }} aria-label="transaction table">
+                                            <TableHead>
+                                                <TableRow>
+                                                    <TableCell>Date</TableCell>
+                                                    <TableCell>Description</TableCell>
+                                                    <TableCell>Category</TableCell>
+                                                    <TableCell align="right">Amount</TableCell>
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {paginatedTransactions.map((item) => {
+                                                    const category = categories.find(c => c.id === item.categoryId);
+                                                    const num = typeof item.amount === 'number' ? item.amount : parseFloat(String(item.amount).replace(/[^0-9.-]+/g, "") || "0");
+                                                    const amountFormatted = currencyService.format(Math.abs(num), item.currency || 'USD');
+                                                    const isIncome = num > 0;
+
+                                                    return (
+                                                        <TableRow
+                                                            key={item.id}
+                                                            sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                                                        >
+                                                            <TableCell component="th" scope="row">
+                                                                {item.date.toLocaleDateString()}
+                                                                <Typography variant="caption" color="text.secondary" display="block">
+                                                                    {item.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                </Typography>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <Typography variant="body2" fontWeight="500">{item.title}</Typography>
+                                                                <Typography variant="caption" color="text.secondary">{item.subtitle}</Typography>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                                    {category ? (
+                                                                        <CategoryIcon category={category} size="small" />
+                                                                    ) : (
+                                                                        <Avatar sx={{
+                                                                            width: 24,
+                                                                            height: 24,
+                                                                            bgcolor: item.flow === 'income' ? '#ecfdf5' : '#fef2f2',
+                                                                            color: item.flow === 'income' ? '#10b981' : '#ef4444'
+                                                                        }}>
+                                                                            {item.flow === 'income' ? <CallReceived sx={{ fontSize: 16 }} /> : <CallMade sx={{ fontSize: 16 }} />}
+                                                                        </Avatar>
+                                                                    )}
+                                                                    <Typography variant="body2">{category?.name || 'General'}</Typography>
+                                                                </Box>
+                                                            </TableCell>
+                                                            <TableCell align="right">
+                                                                <Typography
+                                                                    variant="body2"
+                                                                    fontWeight="600"
+                                                                    sx={{ color: isIncome ? '#10b981' : '#ef4444' }}
+                                                                >
+                                                                    {isIncome ? '+' : '-'}{amountFormatted}
+                                                                </Typography>
+                                                                {item.currency !== baseCurrency && (
+                                                                    <Typography variant="caption" color="text.secondary">
+                                                                        {(() => {
+                                                                            const amountUSD = currencyService.convertToUSD(Math.abs(num), item.currency || 'USD', exchangeRates);
+                                                                            const amountBase = currencyService.convertFromUSD(amountUSD, baseCurrency || 'USD', exchangeRates);
+                                                                            return `≈ ${currencyService.format(amountBase, baseCurrency || 'USD')}`;
+                                                                        })()}
+                                                                    </Typography>
+                                                                )}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    );
+                                                })}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
+                                    <TablePagination
+                                        rowsPerPageOptions={[5, 10, 25]}
+                                        component="div"
+                                        count={filteredTransactions.length}
+                                        rowsPerPage={rowsPerPage}
+                                        page={page}
+                                        onPageChange={handleChangePage}
+                                        onRowsPerPageChange={handleChangeRowsPerPage}
                                     />
-                                );
-                            })}
-                        </List>
+                                    {hasMoreTransactions && (
+                                        <Box sx={{ p: 2, textAlign: 'center', borderTop: '1px solid', borderColor: 'divider' }}>
+                                            <Button
+                                                onClick={loadMoreTransactions}
+                                                variant="outlined"
+                                                size="small"
+                                                sx={{ borderRadius: 4, textTransform: 'none', borderColor: '#06b6d4', color: '#06b6d4' }}
+                                            >
+                                                Load More Transactions from Server
+                                            </Button>
+                                        </Box>
+                                    )}
+                                </Box>
+                            )}
+
+                            {/* Mobile View More Button */}
+                            {isMobile && filteredTransactions.length > visibleTx && (
+                                <Box sx={{ p: 2, pb: 0, display: 'flex', justifyContent: 'center' }}>
+                                    <Button
+                                        onClick={() => setVisibleTx(prev => prev + 5)}
+                                        size="small"
+                                        sx={{ textTransform: 'none', color: '#06b6d4' }}
+                                    >
+                                        View More ({filteredTransactions.length - visibleTx} more)
+                                    </Button>
+                                </Box>
+                            )}
+
+                            {/* Pagination / Load More */}
+                            {hasMoreTransactions && (
+                                <Box sx={{ p: 2, display: 'flex', justifyContent: 'center' }}>
+                                    <Button
+                                        onClick={loadMoreTransactions}
+                                        variant="outlined"
+                                        size="small"
+                                        sx={{ borderRadius: 4, textTransform: 'none', borderColor: '#06b6d4', color: '#06b6d4' }}
+                                    >
+                                        Load More from Server
+                                    </Button>
+                                </Box>
+                            )}
+                        </Box>
                     )}
                 </CardContent>
             </Card>
@@ -527,6 +776,13 @@ export default function Activity() {
                     </Button>
                 </DialogActions>
             </Dialog>
-        </MainLayout>
+            {/* Export Dialog */}
+            <ExportDialog
+                open={exportDialogOpen}
+                onClose={() => setExportDialogOpen(false)}
+                onExport={handleExport}
+                categories={categories}
+            />
+        </MainLayout >
     );
 }

@@ -1,5 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import {
+    startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
+    startOfYear, endOfYear, subDays, subWeeks, subMonths, subYears
+} from "date-fns";
+import {
     collection,
     query,
     orderBy,
@@ -17,6 +21,9 @@ import { currencyService, type Currency } from "../services/currencyService";
 import { processDueBills, hasDueBills } from "../services/billProcessingService";
 import { showBillNotifications } from "../services/notificationService";
 
+
+export type DashboardTimeframe = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
 interface FinanceContextType {
     transactions: Transaction[];
     wallets: Wallet[];
@@ -31,14 +38,23 @@ interface FinanceContextType {
     };
     stats: {
         totalBalance: number;
-        monthlyIncome: number;
-        monthlyExpenses: number;
+        income: number;
+        expenses: number;
         profit: number;
+        incomeChange: number;
+        expensesChange: number;
+        balanceChange: number;
     };
+    dashboardTimeframe: DashboardTimeframe;
+    setDashboardTimeframe: (timeframe: DashboardTimeframe) => void;
     baseCurrency: Currency;
     setBaseCurrency: (currency: Currency) => void;
     availableCurrencies: Record<string, string>;
     exchangeRates: Record<string, number>;
+    loadMoreTransactions: () => void;
+    hasMoreTransactions: boolean;
+    loadMoreBills: () => void;
+    hasMoreBills: boolean;
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
@@ -58,7 +74,22 @@ export const useTransactions = () => {
 };
 
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const [dashboardTimeframe, setDashboardTimeframe] = useState<DashboardTimeframe>('monthly');
     const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [transactionLimit, setTransactionLimit] = useState(50);
+    const [hasMoreTransactions, setHasMoreTransactions] = useState(true);
+
+    const loadMoreTransactions = () => {
+        setTransactionLimit(prev => prev + 20);
+    };
+
+    const [billsLimit, setBillsLimit] = useState(50);
+    const [hasMoreBills, setHasMoreBills] = useState(true);
+
+    const loadMoreBills = () => {
+        setBillsLimit(prev => prev + 20);
+    };
+
     const [wallets, setWallets] = useState<Wallet[]>([]);
     const [bills, setBills] = useState<Bill[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
@@ -81,131 +112,149 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         categories: string | null;
     }>({ transactions: null, wallets: null, bills: null, categories: null });
 
+    const [user, setUser] = useState(auth.currentUser);
+
     useEffect(() => {
-        let unsubTransactions: () => void = () => { };
-        let unsubWallets: () => void = () => { };
-        let unsubBills: () => void = () => { };
-        let unsubCategories: () => void = () => { };
-
-        const authUnsubscribe = auth.onAuthStateChanged((user) => {
-            // Cleanup existing listeners if any
-            unsubTransactions();
-            unsubWallets();
-            unsubBills();
-            unsubCategories();
-
-            if (user) {
-                setLoading(true);
-
-                // 1. Transactions Listener
-                const txQuery = query(
-                    collection(db, "transactions"),
-                    where("userId", "==", user.uid),
-                    orderBy("createdAt", "desc"),
-                    limit(50)
-                );
-
-                unsubTransactions = onSnapshot(txQuery, { includeMetadataChanges: false }, (querySnapshot) => {
-                    const data = querySnapshot.docs.map(doc => {
-                        const rawData = doc.data();
-                        let txDate = new Date();
-                        try {
-                            if (rawData.date instanceof Timestamp) {
-                                txDate = rawData.date.toDate();
-                            } else if (rawData.date) {
-                                txDate = new Date(rawData.date);
-                            }
-                        } catch (e) {
-                            console.error("Date parsing error:", doc.id, e);
-                        }
-                        return { id: doc.id, ...rawData, date: txDate } as Transaction;
-                    });
-                    setTransactions(data);
-                    setErrors(prev => ({ ...prev, transactions: null }));
-                    setLoading(false);
-                }, (err) => {
-                    console.error("FIREBASE ERROR (Transactions):", err.message);
-                    setErrors(prev => ({ ...prev, transactions: err.message }));
-                    setLoading(false);
-                });
-
-                // 2. Wallets Listener
-                const walletQuery = query(
-                    collection(db, "wallets"),
-                    where("userId", "==", user.uid),
-                    orderBy("createdAt", "desc"),
-                    limit(20)
-                );
-                unsubWallets = onSnapshot(walletQuery, (qs) => {
-                    setWallets(qs.docs.map(doc => ({ id: doc.id, ...doc.data() } as Wallet)));
-                    setErrors(prev => ({ ...prev, wallets: null }));
-                }, (err) => {
-                    console.error("FIREBASE ERROR (Wallets):", err.message);
-                    setErrors(prev => ({ ...prev, wallets: err.message }));
-                });
-
-                // 3. Bills Listener
-                const billQuery = query(
-                    collection(db, "bills"),
-                    where("userId", "==", user.uid),
-                    limit(50)
-                );
-                unsubBills = onSnapshot(billQuery, (qs) => {
-                    const fetchedBills = qs.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data(),
-                        dueDate: doc.data().dueDate instanceof Timestamp ? doc.data().dueDate.toDate() : new Date(doc.data().dueDate),
-                    } as Bill));
-
-                    // Sort by dueDate descending (latest first)
-                    setBills(fetchedBills.sort((a, b) => b.dueDate.getTime() - a.dueDate.getTime()));
-                    setErrors(prev => ({ ...prev, bills: null }));
-                }, (err) => {
-                    console.error("FIREBASE ERROR (Bills):", err.message);
-                    setErrors(prev => ({ ...prev, bills: err.message }));
-                });
-
-                // 4. Categories Listener
-                const catQuery = query(
-                    collection(db, "categories"),
-                    where("userId", "==", user.uid),
-                    orderBy("name", "asc")
-                );
-
-                unsubCategories = onSnapshot(catQuery, (qs) => {
-                    const userCategories = qs.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
-                    const defaultCategories = categoryService.getDefaultCategories().map((cat, index) => ({
-                        id: `default-${index}`,
-                        ...cat
-                    } as Category));
-
-                    // Merge: take defaults, then override with specifically named user categories if needed
-                    // (Or just combine them for a rich selection)
-                    setCategories([...defaultCategories, ...userCategories]);
-                    setErrors(prev => ({ ...prev, categories: null }));
-                }, (err) => {
-                    console.error("FIREBASE ERROR (Categories):", err.message);
-                    setErrors(prev => ({ ...prev, categories: err.message }));
-                });
-
-            } else {
+        const unsubscribe = auth.onAuthStateChanged((u) => {
+            setUser(u);
+            if (!u) {
                 setTransactions([]);
                 setWallets([]);
                 setBills([]);
                 setCategories([]);
                 setErrors({ transactions: null, wallets: null, bills: null, categories: null });
                 setLoading(false);
+            } else {
+                setLoading(true);
             }
         });
-
-        return () => {
-            authUnsubscribe();
-            unsubTransactions();
-            unsubWallets();
-            unsubBills();
-            unsubCategories();
-        };
+        return unsubscribe;
     }, []);
+
+    // 1. Transactions Listener
+    useEffect(() => {
+        if (!user) return;
+
+        const txQuery = query(
+            collection(db, "transactions"),
+            where("userId", "==", user.uid),
+            orderBy("createdAt", "desc"),
+            limit(transactionLimit)
+        );
+
+        const unsub = onSnapshot(txQuery, (querySnapshot) => {
+            const data = querySnapshot.docs.map(doc => {
+                const rawData = doc.data();
+                let txDate = new Date();
+                try {
+                    if (rawData.date instanceof Timestamp) {
+                        txDate = rawData.date.toDate();
+                    } else if (rawData.date) {
+                        txDate = new Date(rawData.date);
+                    }
+                } catch (e) {
+                    console.error("Date parsing error:", doc.id, e);
+                }
+                return { id: doc.id, ...rawData, date: isNaN(txDate.getTime()) ? new Date() : txDate } as Transaction;
+            });
+            setTransactions(data);
+            setHasMoreTransactions(data.length >= transactionLimit);
+            setErrors(prev => ({ ...prev, transactions: null }));
+            setLoading(false);
+        }, (err) => {
+            console.error("FIREBASE ERROR (Transactions):", err.message);
+            setErrors(prev => ({ ...prev, transactions: err.message }));
+            setLoading(false);
+        });
+
+        return unsub;
+    }, [user, transactionLimit]);
+
+    // 2. Wallets Listener
+    useEffect(() => {
+        if (!user) return;
+
+        const walletQuery = query(
+            collection(db, "wallets"),
+            where("userId", "==", user.uid),
+            orderBy("createdAt", "desc"),
+            limit(50)
+        );
+        const unsub = onSnapshot(walletQuery, (qs) => {
+            setWallets(qs.docs.map(doc => ({ id: doc.id, ...doc.data() } as Wallet)));
+            setErrors(prev => ({ ...prev, wallets: null }));
+        }, (err) => {
+            console.error("FIREBASE ERROR (Wallets):", err.message);
+            setErrors(prev => ({ ...prev, wallets: err.message }));
+        });
+        return unsub;
+    }, [user]);
+
+    // 3. Bills Listener
+    useEffect(() => {
+        if (!user) return;
+
+        const billQuery = query(
+            collection(db, "bills"),
+            where("userId", "==", user.uid),
+            orderBy("dueDate", "desc"),
+            limit(billsLimit)
+        );
+        const unsub = onSnapshot(billQuery, (qs) => {
+            const fetchedBills = qs.docs.map(doc => {
+                const raw = doc.data();
+                let d = new Date();
+                if (raw.dueDate instanceof Timestamp) {
+                    d = raw.dueDate.toDate();
+                } else if (raw.dueDate) {
+                    d = new Date(raw.dueDate);
+                }
+                return {
+                    id: doc.id,
+                    ...raw,
+                    dueDate: isNaN(d.getTime()) ? new Date() : d,
+                } as Bill;
+            });
+
+            const sortedBills = fetchedBills.sort((a, b) => b.dueDate.getTime() - a.dueDate.getTime());
+            setBills(sortedBills);
+            setHasMoreBills(fetchedBills.length >= billsLimit);
+            setErrors(prev => ({ ...prev, bills: null }));
+        }, (err) => {
+            console.error("FIREBASE ERROR (Bills):", err.message);
+            let msg = err.message;
+            if (msg.includes('index')) {
+                msg = "Missing Firestore index for bills. Please check the browser console for the creation link.";
+            }
+            setErrors(prev => ({ ...prev, bills: msg }));
+        });
+        return unsub;
+    }, [user, billsLimit]);
+
+    // 4. Categories Listener
+    useEffect(() => {
+        if (!user) return;
+
+        const catQuery = query(
+            collection(db, "categories"),
+            where("userId", "==", user.uid),
+            orderBy("name", "asc")
+        );
+
+        const unsub = onSnapshot(catQuery, (qs) => {
+            const userCategories = qs.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
+            const defaultCategories = categoryService.getDefaultCategories().map((cat, index) => ({
+                id: `default-${index}`,
+                ...cat
+            } as Category));
+            setCategories([...defaultCategories, ...userCategories]);
+            setErrors(prev => ({ ...prev, categories: null }));
+        }, (err) => {
+            console.error("FIREBASE ERROR (Categories):", err.message);
+            setErrors(prev => ({ ...prev, categories: err.message }));
+        });
+        return unsub;
+    }, [user]); // Re-run effect when limits change
 
     // Auto-process due bills when data is loaded
     const isProcessingBills = React.useRef(false);
@@ -258,40 +307,111 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         fetchRatesAndCurrencies();
     }, []);
 
-    // Memoize calculations
+    // Memoize calculations with dynamic timeframe
     const stats = useMemo(() => {
-        // Normalize all balances to the selected baseCurrency
+        const now = new Date();
+        let currentStart = startOfMonth(now);
+        let currentEnd = endOfMonth(now);
+        let prevStart = startOfMonth(subMonths(now, 1));
+        let prevEnd = endOfMonth(subMonths(now, 1));
+
+        switch (dashboardTimeframe) {
+            case 'daily':
+                currentStart = startOfDay(now);
+                currentEnd = endOfDay(now);
+                prevStart = startOfDay(subDays(now, 1));
+                prevEnd = endOfDay(subDays(now, 1));
+                break;
+            case 'weekly':
+                currentStart = startOfWeek(now);
+                currentEnd = endOfWeek(now);
+                prevStart = startOfWeek(subWeeks(now, 1));
+                prevEnd = endOfWeek(subWeeks(now, 1));
+                break;
+            case 'monthly':
+                currentStart = startOfMonth(now);
+                currentEnd = endOfMonth(now);
+                prevStart = startOfMonth(subMonths(now, 1));
+                prevEnd = endOfMonth(subMonths(now, 1));
+                break;
+            case 'yearly':
+                currentStart = startOfYear(now);
+                currentEnd = endOfYear(now);
+                prevStart = startOfYear(subYears(now, 1));
+                prevEnd = endOfYear(subYears(now, 1));
+                break;
+        }
+
+        const filterByDate = (txs: Transaction[], start: Date, end: Date) => {
+            return txs.filter(t => t.date >= start && t.date <= end);
+        };
+
+        const calculateTotal = (txs: Transaction[], flow: 'income' | 'expense') => {
+            return txs
+                .filter(t => t.flow === flow)
+                .reduce((sum, t) => {
+                    const val = typeof t.amount === 'number' ? t.amount : parseFloat(String(t.amount).replace(/[^0-9.-]+/g, "") || "0");
+                    const valUSD = currencyService.convertToUSD(val, t.currency || 'USD', exchangeRates);
+                    const valBase = currencyService.convertFromUSD(valUSD, baseCurrency, exchangeRates);
+                    return sum + Math.abs(valBase);
+                }, 0);
+        };
+
+        const currentTxs = filterByDate(transactions, currentStart, currentEnd);
+        const prevTxs = filterByDate(transactions, prevStart, prevEnd);
+
+        const currentIncome = calculateTotal(currentTxs, 'income');
+        const prevIncome = calculateTotal(prevTxs, 'income');
+        const currentExpenses = calculateTotal(currentTxs, 'expense');
+        const prevExpenses = calculateTotal(prevTxs, 'expense');
+
+        const calculateChange = (current: number, prev: number) => {
+            if (prev === 0) return current > 0 ? 100 : 0;
+            return ((current - prev) / prev) * 100;
+        };
+
+        // Total Balance (Snapshot - always current total)
         const totalBalanceBase = wallets.reduce((sum, w) => {
             const valUSD = currencyService.convertToUSD(w.balance, w.currency || 'USD', exchangeRates);
             return sum + currencyService.convertFromUSD(valUSD, baseCurrency, exchangeRates);
         }, 0);
 
-        const incomeBase = transactions
-            .filter(t => t.flow === 'income')
-            .reduce((sum, t) => {
-                const val = typeof t.amount === 'number' ? t.amount : parseFloat(String(t.amount).replace(/[^0-9.-]+/g, "") || "0");
-                const valUSD = currencyService.convertToUSD(val, t.currency || 'USD', exchangeRates);
-                return sum + currencyService.convertFromUSD(valUSD, baseCurrency, exchangeRates);
-            }, 0);
-
-        const expensesBase = transactions
-            .filter(t => t.flow === 'expense')
-            .reduce((sum, t) => {
-                const val = typeof t.amount === 'number' ? t.amount : parseFloat(String(t.amount).replace(/[^0-9.-]+/g, "") || "0");
-                const valUSD = currencyService.convertToUSD(val, t.currency || 'USD', exchangeRates);
-                return sum + Math.abs(currencyService.convertFromUSD(valUSD, baseCurrency, exchangeRates));
-            }, 0);
+        // For balance change, ideally we'd need historical wallet balances. 
+        // As a proxy, we use (Income - Expense) delta which contributes to balance change in the period.
+        // OR better: we can calculate net cash flow for the period vs previous period? 
+        // Let's stick to Income - Expense for "Profit/Net Flow" change
 
         return {
             totalBalance: totalBalanceBase,
-            monthlyIncome: incomeBase,
-            monthlyExpenses: expensesBase,
-            profit: incomeBase - expensesBase
+            income: currentIncome,
+            expenses: currentExpenses,
+            profit: currentIncome - currentExpenses,
+            incomeChange: calculateChange(currentIncome, prevIncome),
+            expensesChange: calculateChange(currentExpenses, prevExpenses),
+            balanceChange: calculateChange(currentIncome - currentExpenses, prevIncome - prevExpenses) // Net flow change
         };
-    }, [wallets, transactions, exchangeRates, baseCurrency]);
+    }, [wallets, transactions, exchangeRates, baseCurrency, dashboardTimeframe]);
 
     return (
-        <FinanceContext.Provider value={{ transactions, wallets, bills, categories, loading, errors, stats, baseCurrency, setBaseCurrency, availableCurrencies, exchangeRates }}>
+        <FinanceContext.Provider value={{
+            transactions,
+            wallets,
+            bills,
+            categories,
+            loading,
+            errors,
+            stats,
+            baseCurrency,
+            setBaseCurrency,
+            dashboardTimeframe,
+            setDashboardTimeframe,
+            availableCurrencies,
+            exchangeRates,
+            loadMoreTransactions,
+            hasMoreTransactions,
+            loadMoreBills,
+            hasMoreBills
+        }}>
             {children}
         </FinanceContext.Provider>
     );

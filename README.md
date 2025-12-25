@@ -1,73 +1,36 @@
-# React + TypeScript + Vite
+# LedgerLink - Personal Finance Manager
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+LedgerLink is a **personal finance application** designed to help users track their income, expenses, and manage bills effectively. It is built as a portfolio project to demonstrate modern web development practices using React, TypeScript, and Firebase.
 
-Currently, two official plugins are available:
+## 🚀 Purpose & Constraints
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+This application is intended for **personal use** and is currently hosted on **Firebase's Free Tier**.
+- **Personal Scope**: Designed for individual users to manage their personal finances.
+- **Free Tier Limits**: Database operations and hosting resources are limited by Firebase's free tier quotas. Users may experience rate limiting if usage exceeds these free quotas (e.g., extensive daily reads/writes).
 
-## React Compiler
+## ✨ Key Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Smart Categorization**: The app uses intelligent suggestions to automatically recommend categories and icons based on your input (e.g., typing "Netflix" suggests the "Entertainment" category).
+- **Multi-Currency Support**: Seamlessly manage wallets in different currencies with real-time exchange rate conversion for a unified portfolio view.
+- **Automated Bill Processing**: 
+    - **Recurring Bills**: Automatically generates upcoming bills based on set frequencies (daily, weekly, monthly).
+    - **Auto-Deduct**: Option to automatically deduct bill amounts from specified wallets on their due dates.
+- **Atomic Transactions**: Ensures data integrity by treating related operations (e.g., paying a bill and updating wallet balance) as single, indivisible units.
+- **Real-time Updates**: changes to your data are reflected instantly across all devices.
+- **Responsive Design**: A premium, mobile-first UI built with Material UI, ensuring a great experience on phones, tablets, and desktops.
 
-## Expanding the ESLint configuration
+## 🛠️ Technology Stack
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **Frontend**: React (Vite), TypeScript
+- **UI Framework**: Material UI (MUI)
+- **Backend/Database**: Firebase Firestore
+- **Authentication**: Firebase Auth
+- **State Management**: React Context API
+- **Others**: React Router, Recharts, React Hot Toast
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## 📱 Mobile Experience
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+The application is optimized for mobile usage, featuring:
+- **Card-based Layouts**: Easy to read and interact with on touch screens.
+- **Collapsible Lists**: Efficient use of screen space for wallets and transactions.
+- **Touch-friendly Controls**: Large buttons and intuitive forms.

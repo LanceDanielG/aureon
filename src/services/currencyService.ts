@@ -88,5 +88,30 @@ export const currencyService = {
         } catch {
             return currency;
         }
+    },
+
+    formatWithCode(amount: number, currency: Currency): string {
+        try {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: currency,
+                currencyDisplay: 'code',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(amount);
+        } catch {
+            return `${currency} ${amount.toFixed(2)}`;
+        }
+    },
+
+    formatForPDF(amount: number, currency: Currency): string {
+        // Standard PDF fonts (Helvetica) only support WinAnsi encoding.
+        // Safe symbols: $ (USD), £ (GBP), ¥ (JPY), € (EUR)
+        // Unsafe: ₱ (PHP), ₹ (INR), etc.
+        const safeCurrencies = ['USD', 'EUR', 'GBP', 'JPY'];
+        if (safeCurrencies.includes(currency)) {
+            return this.format(amount, currency);
+        }
+        return this.formatWithCode(amount, currency);
     }
 };

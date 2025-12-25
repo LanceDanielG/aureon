@@ -41,14 +41,13 @@ export default function Register({ isLogin, setIsLogin }: { isLogin?: boolean, s
                 await signInWithPopup(auth, googleProvider)
             }
 
-            console.log("Sign In Clicked");
             navigate('/dashboard');
         } catch (error: unknown) {
             if (error instanceof FirebaseError) {
                 if (error.code === "auth/popup-closed-by-user") {
-                    console.log("Popup closed by user, please try again.");
+                    // Handled gracefully
                 } else if (error.code === "auth/cancelled-popup-request") {
-                    console.log("Popup request cancelled, maybe another popup is open.");
+                    // Handled gracefully
                 } else {
                     console.error("Sign-in error:", error);
                 }
@@ -100,7 +99,6 @@ export default function Register({ isLogin, setIsLogin }: { isLogin?: boolean, s
             await createUserWithEmailAndPassword(auth, emailSignUp, passwordSignUp);
             toast.dismiss(loadingToast);
             toast.success("Account created successfully!");
-            console.log("Registered Successfully");
             navigate('/dashboard');
         } catch (error: unknown) {
             toast.dismiss(loadingToast);

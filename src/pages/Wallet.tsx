@@ -7,11 +7,11 @@ import {
     DialogTitle, DialogContent, DialogActions, TextField,
     List, ListItem, ListItemText, Chip, Divider, CircularProgress,
     MenuItem, Select, InputLabel, FormControl, useTheme, useMediaQuery,
-    Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Avatar, Checkbox,
+    Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     TablePagination
 } from "@mui/material";
-import { Add, AccountBalance, Payments, CheckCircle, Download, CreditCard, Savings, Wallet as WalletIcon, AttachMoney, Category as CategoryIconMD } from "@mui/icons-material";
-import CategoryIcon, { getMaterialIcon } from "../components/Common/CategoryIcon";
+import { Add, AccountBalance, Payments, CheckCircle, Download, CreditCard, Savings, Wallet as WalletIcon, AttachMoney } from "@mui/icons-material";
+import { getMaterialIcon } from "../components/Common/CategoryIcon";
 import ExportDialog from "../components/Common/ExportDialog";
 import { useFinance } from "../context/FinanceContext";
 import { walletService } from "../services/walletService";
@@ -21,8 +21,6 @@ import { auth } from "../config/firebase";
 import { toast } from "react-hot-toast";
 import { currencyService, type Currency } from "../services/currencyService";
 
-
-// Helper to render icon by name
 const getWalletIcon = (iconName: string) => {
     switch (iconName) {
         case 'CreditCard': return <CreditCard />;
@@ -46,10 +44,9 @@ export default function Wallet() {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-    // On mobile, show limited wallets. On desktop, show all.
     const displayedWallets = isMobile ? wallets.slice(0, visibleWallets) : wallets;
 
-    // Filters for Bills
+
     const [billSearch, setBillSearch] = useState('');
     const [billCategory, setBillCategory] = useState('All');
     const [billStatus, setBillStatus] = useState('All');

@@ -277,7 +277,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 const result = await processDueBills(bills, wallets, auth.currentUser.uid, exchangeRates);
 
                 if (result.processed > 0 || result.recurring > 0) {
-                    console.log(`Bill processing complete: ${result.processed} paid, ${result.recurring} recurring created, ${result.failed} failed`);
+                    // Log to internal analytics or keep for debugging
                 }
 
                 // Show notifications after processing

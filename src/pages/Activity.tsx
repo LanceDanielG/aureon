@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import MainLayout from "../components/Layout/MainLayout";
 import PageHeader from "../components/Common/PageHeader";
 import TransactionItem from "../components/Common/TransactionItem";
@@ -10,7 +10,6 @@ import { toast } from "react-hot-toast";
 import { useFinance } from "../context/FinanceContext";
 import { currencyService, type Currency } from "../services/currencyService";
 import { categoryService, findSuggestion } from "../services/categoryService";
-import { useEffect as useStandardEffect } from "react";
 import CategoryIcon, { getMaterialIcon } from "../components/Common/CategoryIcon";
 import ExportDialog from "../components/Common/ExportDialog";
 
@@ -40,10 +39,10 @@ export default function Activity() {
     });
 
     const [visibleTx, setVisibleTx] = useState(5);
+
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-    // Filters
     const [searchQuery, setSearchQuery] = useState('');
     const [filterCategory, setFilterCategory] = useState('all');
     const [filterType, setFilterType] = useState('all');
@@ -60,7 +59,6 @@ export default function Activity() {
 
     const displayedTransactions = isMobile ? filteredTransactions.slice(0, visibleTx) : filteredTransactions;
 
-    // Pagination for desktop table
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
 
@@ -112,8 +110,8 @@ export default function Activity() {
         }
     };
 
-    // Smart Suggest Logic
-    useStandardEffect(() => {
+
+    useEffect(() => {
         const suggestion = findSuggestion(newCategory.name);
         if (suggestion) {
             setNewCategory(prev => ({

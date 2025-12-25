@@ -66,8 +66,7 @@ export async function processDueBills(
         return billDate <= today && bill.autoDeduct && !!bill.walletId;
     });
 
-    console.log(`Processing ${dueBills.length} potentially active bills`);
-
+    // Processing start point
     for (const bill of dueBills) {
         // ---------- 1. Auto-deduct payment ----------
         // Only if not paid, auto-deduct is on, wallet is set, and it is due
@@ -198,9 +197,7 @@ export async function processDueBills(
                         newlyGeneratedCount++;
                         lastSuccessfullyGeneratedDate = nextDueDate;
                     } else {
-                        console.log(`[Recurring] Skipping duplicate for ${bill.title} on ${dueDateToSave.toDateString()}`);
-                        // Even if skipped, we treat it as "processed" for moving the cursor forward 
-                        // so we don't get stuck checking it forever if the lastGeneratedDate isn't updated.
+                        // Duplicate found, skip
                         lastSuccessfullyGeneratedDate = nextDueDate;
                     }
 

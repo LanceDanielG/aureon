@@ -26,7 +26,6 @@ export const currencyService = {
             if (data.rates) {
                 cachedRates = { ...data.rates, USD: 1 };
                 lastFetch = now;
-                console.log(`Updated all exchange rates relative to USD`);
             }
             return cachedRates;
         } catch (error) {

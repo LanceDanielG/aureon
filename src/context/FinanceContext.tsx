@@ -268,7 +268,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             // Check if there are any due bills to process
             if (!hasDueBills(bills)) {
                 // Even if no bills to process, show notifications for overdue/upcoming
-                showBillNotifications(bills);
+                // prevent notifications on auth pages
+                const currentPath = window.location.pathname;
+                if (!['/', '/login', '/register'].includes(currentPath)) {
+                    showBillNotifications(bills);
+                }
                 return;
             }
 
@@ -281,7 +285,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 }
 
                 // Show notifications after processing
-                showBillNotifications(bills);
+                const currentPath = window.location.pathname;
+                if (!['/', '/login', '/register'].includes(currentPath)) {
+                    showBillNotifications(bills);
+                }
             } catch (error) {
                 console.error("Error processing bills:", error);
             } finally {

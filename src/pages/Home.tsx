@@ -1,19 +1,30 @@
 import { Button } from "@mui/material";
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { auth } from "../config/firebase";
 import LogIn from "../components/Auth/LogIn";
 import Register from "../components/Auth/Register";
 
 export default function Home() {
     const [isLogin, setIsLogin] = useState(true);
 
+    const navigate = useNavigate();
+
     useEffect(() => {
+        const unsubscribe = auth.onAuthStateChanged((user) => {
+            if (user) {
+                navigate('/dashboard');
+            }
+        });
+
         const originalColor = document.body.style.backgroundColor;
         document.body.style.backgroundColor = '#242424';
 
         return () => {
+            unsubscribe();
             document.body.style.backgroundColor = originalColor;
         };
-    }, []);
+    }, [navigate]);
 
     return (
         <div className={`relative w-full h-screen md:h-[550px] md:w-full md:max-w-[850px] bg-white md:rounded-2xl md:shadow-2xl overflow-hidden font-poppins`}>

@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../config/firebase";
 import { type Currency } from "./currencyService";
+import { validationUtils } from "../utils/validationUtils";
 
 export interface Wallet {
     id?: string;
@@ -29,6 +30,14 @@ const COLLECTION_NAME = "wallets";
 export const walletService = {
     // Create
     async addWallet(wallet: Omit<Wallet, 'id' | 'createdAt'>) {
+        // Input Validation
+        if (!validationUtils.isValidString(wallet.userId)) throw new Error("Invalid User ID");
+        if (!validationUtils.isValidString(wallet.name)) throw new Error("Wallet name is required");
+        if (!validationUtils.isValidNumber(wallet.balance)) throw new Error("Invalid Balance");
+
+        // Sanitize
+        wallet.name = validationUtils.sanitizeString(wallet.name);
+
         try {
             const docRef = await addDoc(collection(db, COLLECTION_NAME), {
                 ...wallet,

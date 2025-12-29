@@ -56,7 +56,11 @@ export default function Dashboard() {
                 <Grid size={{ xs: 12, md: 8 }}>
                     <GradientCard variant="ocean">
                         <Typography variant="subtitle2" sx={{ opacity: 0.8 }}>Total Balance ({baseCurrency})</Typography>
-                        <Typography variant="h3" fontWeight="bold" sx={{ my: 2 }}>
+                        <Typography variant="h3" fontWeight="bold" sx={{ 
+                            my: 2,
+                            fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
+                            wordBreak: 'break-word'
+                        }}>
                             {currencyService.format(stats.totalBalance, baseCurrency)}
                         </Typography>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>

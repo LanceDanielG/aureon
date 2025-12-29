@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../config/firebase";
 import { currencyService, type Currency } from "./currencyService";
+import { validationUtils } from "../utils/validationUtils";
 
 export interface Transaction {
     id?: string;
@@ -32,6 +33,16 @@ const COLLECTION_NAME = "transactions";
 export const transactionService = {
     // Create
     async addTransaction(transaction: Omit<Transaction, 'id' | 'createdAt'>) {
+        // Input Validation
+        if (!validationUtils.isValidString(transaction.userId)) throw new Error("Invalid User ID");
+        if (!validationUtils.isValidString(transaction.title)) throw new Error("Title is required");
+        if (!validationUtils.isValidNumber(transaction.amount)) throw new Error("Invalid Amount");
+        if (!transaction.categoryId) throw new Error("Category is required");
+
+        // Sanitize
+        transaction.title = validationUtils.sanitizeString(transaction.title);
+        transaction.subtitle = validationUtils.sanitizeString(transaction.subtitle);
+
         try {
             const docRef = await addDoc(collection(db, COLLECTION_NAME), {
                 ...transaction,
@@ -46,6 +57,16 @@ export const transactionService = {
 
     // Atomic transaction that updates a wallet balance
     async addTransactionWithWallet(transaction: Omit<Transaction, 'id' | 'createdAt'>, exchangeRates?: Record<string, number>) {
+        // Input Validation
+        if (!validationUtils.isValidString(transaction.userId)) throw new Error("Invalid User ID");
+        if (!validationUtils.isValidString(transaction.title)) throw new Error("Title is required");
+        if (!validationUtils.isValidNumber(transaction.amount)) throw new Error("Invalid Amount");
+        if (!transaction.categoryId) throw new Error("Category is required");
+
+        // Sanitize
+        transaction.title = validationUtils.sanitizeString(transaction.title);
+        transaction.subtitle = validationUtils.sanitizeString(transaction.subtitle);
+
         if (!transaction.walletId) {
             return this.addTransaction(transaction);
         }

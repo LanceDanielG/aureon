@@ -30,27 +30,11 @@ export default function TransactionItem({
                 py: 2,
                 borderBottom: isLast ? 'none' : 1,
                 borderColor: 'divider',
-                '&:hover': { bgcolor: 'action.hover', borderRadius: '8px' }
+                '&:hover': { bgcolor: 'action.hover', borderRadius: '8px' },
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
             }}
-            secondaryAction={
-                <Box sx={{ textAlign: 'right' }}>
-                    <Typography
-                        variant="subtitle1"
-                        fontWeight="bold"
-                        sx={{ color: amount.startsWith('+') ? '#10b981' : amount.startsWith('-') ? '#ef4444' : 'text.primary' }}
-                    >
-                        {amount}
-                    </Typography>
-                    {secondaryAmount && (
-                        <Typography variant="caption" sx={{ display: 'block', mt: -0.5, opacity: 0.7, fontStyle: 'italic' }}>
-                            ≈ {secondaryAmount}
-                        </Typography>
-                    )}
-                    <Typography variant="body2" color="text.secondary">
-                        {date || 'Completed'}
-                    </Typography>
-                </Box>
-            }
         >
             <ListItemAvatar>
                 <Avatar sx={{ bgcolor: iconBgColor, color: iconColor }}>
@@ -59,16 +43,34 @@ export default function TransactionItem({
             </ListItemAvatar>
             <ListItemText
                 primary={
-                    <Typography variant="subtitle1" fontWeight="600">
+                    <Typography variant="subtitle1" fontWeight="600" noWrap>
                         {title}
                     </Typography>
                 }
                 secondary={
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="text.secondary" noWrap>
                         {subtitle}
                     </Typography>
                 }
+                sx={{ mr: 2, overflow: 'hidden' }}
             />
+            <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+                <Typography
+                    variant="subtitle1"
+                    fontWeight="bold"
+                    sx={{ color: amount.startsWith('+') ? '#10b981' : amount.startsWith('-') ? '#ef4444' : 'text.primary' }}
+                >
+                    {amount}
+                </Typography>
+                {secondaryAmount && (
+                    <Typography variant="caption" sx={{ display: 'block', mt: -0.5, opacity: 0.7, fontStyle: 'italic' }}>
+                        ≈ {secondaryAmount}
+                    </Typography>
+                )}
+                <Typography variant="body2" color="text.secondary">
+                    {date || 'Completed'}
+                </Typography>
+            </Box>
         </ListItem>
     );
 }

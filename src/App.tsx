@@ -21,6 +21,7 @@ import { Toaster } from 'react-hot-toast';
 import { ThemeContextProvider } from './context/ThemeContext';
 import { FinanceProvider } from './context/FinanceContext';
 import ErrorBoundary from './components/Common/ErrorBoundary';
+import ProtectedRoute from './components/Auth/ProtectedRoute';
 
 function App() {
 
@@ -42,22 +43,22 @@ function App() {
         },
         {
             path: "/dashboard",
-            element: <Dashboard />,
+            element: <ProtectedRoute><Dashboard /></ProtectedRoute>,
             errorElement: <RouteError />
         },
         {
             path: "/wallet",
-            element: <Wallet />,
+            element: <ProtectedRoute><Wallet /></ProtectedRoute>,
             errorElement: <RouteError />
         },
         {
             path: "/activity",
-            element: <Activity />,
+            element: <ProtectedRoute><Activity /></ProtectedRoute>,
             errorElement: <RouteError />
         },
         {
             path: "/settings",
-            element: <Settings />,
+            element: <ProtectedRoute><Settings /></ProtectedRoute>,
             errorElement: <RouteError />
         }
     ]);

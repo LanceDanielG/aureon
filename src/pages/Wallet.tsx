@@ -8,7 +8,7 @@ import {
     List, ListItem, ListItemText, Chip, Divider, CircularProgress,
     MenuItem, Select, InputLabel, FormControl, useTheme, useMediaQuery,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    TablePagination
+    TablePagination, Tooltip
 } from "@mui/material";
 import { Add, AccountBalance, Payments, CheckCircle, Download, CreditCard, Savings, Wallet as WalletIcon, AttachMoney } from "@mui/icons-material";
 import { getMaterialIcon } from "../components/Common/CategoryIcon";
@@ -313,13 +313,24 @@ export default function Wallet() {
                                             <Typography variant="h6">{wallet.name}</Typography>
                                             {getWalletIcon(wallet.icon)}
                                         </Box>
-                                        <Box>
-                                            <Typography variant="h4" fontWeight="bold">
-                                                {currencyService.format(wallet.balance, walletCurrency)}
-                                            </Typography>
+                                        <Box sx={{ overflow: 'hidden', minWidth: 0 }}>
+                                            <Tooltip title={currencyService.format(wallet.balance, walletCurrency)} arrow placement="bottom">
+                                                <Typography
+                                                    variant="h4"
+                                                    fontWeight="bold"
+                                                    sx={{
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        whiteSpace: 'nowrap',
+                                                        cursor: 'help'
+                                                    }}
+                                                >
+                                                    {currencyService.formatCompact(wallet.balance, walletCurrency)}
+                                                </Typography>
+                                            </Tooltip>
                                             {isDifferentFromBase && (
-                                                <Typography variant="subtitle2" sx={{ opacity: 0.8, fontStyle: 'italic', mt: -0.5 }}>
-                                                    ≈ {currencyService.format(
+                                                <Typography variant="subtitle2" sx={{ opacity: 0.8, fontStyle: 'italic', mt: -0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    ≈ {currencyService.formatCompact(
                                                         currencyService.convertFromUSD(
                                                             currencyService.convertToUSD(wallet.balance, walletCurrency, exchangeRates),
                                                             baseCurrency,

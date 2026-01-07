@@ -75,6 +75,22 @@ export const currencyService = {
         }
     },
 
+    // Format without unnecessary .00 decimals
+    formatClean(amount: number, currency: Currency): string {
+        try {
+            const hasDecimals = amount % 1 !== 0;
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: currency,
+                minimumFractionDigits: hasDecimals ? 2 : 0,
+                maximumFractionDigits: 2
+            }).format(amount);
+        } catch {
+            const hasDecimals = amount % 1 !== 0;
+            return `${currency} ${hasDecimals ? amount.toFixed(2) : Math.round(amount)}`;
+        }
+    },
+
     getSymbol(currency: Currency): string {
         try {
             const formatter = new Intl.NumberFormat('en-US', {
@@ -112,5 +128,47 @@ export const currencyService = {
             return this.format(amount, currency);
         }
         return this.formatWithCode(amount, currency);
+    },
+
+    formatCompact(amount: number, currency: Currency, maxLength: number = 9): string {
+        // First try the clean format (no .00 decimals)
+        const cleanFormat = this.formatClean(amount, currency);
+
+        // If it fits within the max length, use the clean format
+        if (cleanFormat.length <= maxLength) {
+            return cleanFormat;
+        }
+
+        // Otherwise, use compact format
+        const symbol = this.getSymbol(currency);
+        const absAmount = Math.abs(amount);
+        const sign = amount < 0 ? '-' : '';
+
+        const formatValue = (value: number): string => {
+            // Round to 2 decimal places first
+            const rounded = Math.round(value * 100) / 100;
+            // If it's a whole number, no decimals
+            if (rounded === Math.floor(rounded)) {
+                return Math.floor(rounded).toString();
+            }
+            // If one decimal place is enough (e.g., 2.50 -> 2.5)
+            if (Math.round(rounded * 10) / 10 === rounded) {
+                return rounded.toFixed(1);
+            }
+            // Otherwise show 2 decimals
+            return rounded.toFixed(2);
+        };
+
+        if (absAmount >= 1_000_000_000_000) {
+            return `${sign}${symbol}${formatValue(absAmount / 1_000_000_000_000)}T`;
+        } else if (absAmount >= 1_000_000_000) {
+            return `${sign}${symbol}${formatValue(absAmount / 1_000_000_000)}B`;
+        } else if (absAmount >= 1_000_000) {
+            return `${sign}${symbol}${formatValue(absAmount / 1_000_000)}M`;
+        } else if (absAmount >= 1_000) {
+            return `${sign}${symbol}${formatValue(absAmount / 1_000)}K`;
+        }
+        // For amounts under 1000, show without decimals
+        return `${sign}${symbol}${Math.round(absAmount)}`;
     }
 };

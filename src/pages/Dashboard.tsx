@@ -3,7 +3,7 @@ import MainLayout from "../components/Layout/MainLayout";
 import PageHeader from "../components/Common/PageHeader";
 import GradientCard from "../components/Common/GradientCard";
 import TransactionItem from "../components/Common/TransactionItem";
-import { Card, CardContent, Grid, Typography, Box, List, CircularProgress, Button } from "@mui/material";
+import { Card, CardContent, Grid, Typography, Box, List, CircularProgress, Button, Tooltip } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useFinance } from "../context/FinanceContext";
 import { CallReceived, CallMade, TrendingUp } from "@mui/icons-material";
@@ -56,13 +56,20 @@ export default function Dashboard() {
                 <Grid size={{ xs: 12, md: 8 }}>
                     <GradientCard variant="ocean">
                         <Typography variant="subtitle2" sx={{ opacity: 0.8 }}>Total Balance ({baseCurrency})</Typography>
-                        <Typography variant="h3" fontWeight="bold" sx={{ 
-                            my: 2,
-                            fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
-                            wordBreak: 'break-word'
-                        }}>
-                            {currencyService.format(stats.totalBalance, baseCurrency)}
-                        </Typography>
+                        <Tooltip title={currencyService.format(stats.totalBalance, baseCurrency)} arrow placement="bottom">
+                            <Typography
+                                variant="h3"
+                                fontWeight="bold"
+                                sx={{
+                                    my: 2,
+                                    fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
+                                    wordBreak: 'break-word',
+                                    cursor: 'help'
+                                }}
+                            >
+                                {currencyService.formatCompact(stats.totalBalance, baseCurrency)}
+                            </Typography>
+                        </Tooltip>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: 'rgba(255,255,255,0.2)', px: 1.5, py: 0.5, borderRadius: '8px' }}>
                                 <TrendingUp sx={{ mr: 0.5, fontSize: 18, transform: stats.incomeChange < 0 ? 'rotate(180deg)' : 'none' }} />
@@ -100,7 +107,7 @@ export default function Dashboard() {
                                     <Box key={bill.id} sx={{ mb: 1, display: 'flex', justifyContent: 'space-between' }}>
                                         <Typography variant="body2" fontWeight="500">{bill.title}</Typography>
                                         <Typography variant="body2" fontWeight="bold" color="error.main">
-                                            -${bill.amount}
+                                            -{currencyService.formatCompact(bill.amount, bill.currency || 'PHP')}
                                         </Typography>
                                     </Box>
                                 ))}

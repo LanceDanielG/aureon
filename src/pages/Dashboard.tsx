@@ -3,13 +3,14 @@ import MainLayout from "../components/Layout/MainLayout";
 import PageHeader from "../components/Common/PageHeader";
 import GradientCard from "../components/Common/GradientCard";
 import TransactionItem from "../components/Common/TransactionItem";
-import { Card, CardContent, Grid, Typography, Box, List, CircularProgress, Button, Tooltip } from "@mui/material";
+import { Card, CardContent, Grid, Typography, Box, List, Button, Tooltip } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useFinance } from "../context/FinanceContext";
 import { CallReceived, CallMade, TrendingUp } from "@mui/icons-material";
 
 import { currencyService } from "../services/currencyService";
 import { getMaterialIcon } from "../components/Common/CategoryIcon";
+import { DashboardStatSkeleton, TransactionItemSkeleton } from "../components/Common/Skeletons";
 
 import { ToggleButton, ToggleButtonGroup } from "@mui/material";
 
@@ -18,7 +19,7 @@ export default function Dashboard() {
         transactions,
         bills,
         categories,
-        loading,
+        isInitialLoading,
         errors,
         stats,
         baseCurrency,
@@ -54,34 +55,38 @@ export default function Dashboard() {
             <Grid container spacing={3}>
                 {/* Balance Card */}
                 <Grid size={{ xs: 12, md: 8 }}>
-                    <GradientCard variant="ocean">
-                        <Typography variant="subtitle2" sx={{ opacity: 0.8 }}>Total Balance ({baseCurrency})</Typography>
-                        <Tooltip title={currencyService.format(stats.totalBalance, baseCurrency)} arrow placement="bottom">
-                            <Typography
-                                variant="h3"
-                                fontWeight="bold"
-                                sx={{
-                                    my: 2,
-                                    fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
-                                    wordBreak: 'break-word',
-                                    cursor: 'help'
-                                }}
-                            >
-                                {currencyService.formatCompact(stats.totalBalance, baseCurrency)}
-                            </Typography>
-                        </Tooltip>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: 'rgba(255,255,255,0.2)', px: 1.5, py: 0.5, borderRadius: '8px' }}>
-                                <TrendingUp sx={{ mr: 0.5, fontSize: 18, transform: stats.incomeChange < 0 ? 'rotate(180deg)' : 'none' }} />
-                                <Typography variant="body2">
-                                    {stats.incomeChange > 0 ? '+' : ''}{stats.incomeChange.toFixed(1)}%
+                    {isInitialLoading ? (
+                        <DashboardStatSkeleton />
+                    ) : (
+                        <GradientCard variant="ocean">
+                            <Typography variant="subtitle2" sx={{ opacity: 0.8 }}>Total Balance ({baseCurrency})</Typography>
+                            <Tooltip title={currencyService.format(stats.totalBalance, baseCurrency)} arrow placement="bottom">
+                                <Typography
+                                    variant="h3"
+                                    fontWeight="bold"
+                                    sx={{
+                                        my: 2,
+                                        fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
+                                        wordBreak: 'break-word',
+                                        cursor: 'help'
+                                    }}
+                                >
+                                    {currencyService.formatCompact(stats.totalBalance, baseCurrency)}
+                                </Typography>
+                            </Tooltip>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: 'rgba(255,255,255,0.2)', px: 1.5, py: 0.5, borderRadius: '8px' }}>
+                                    <TrendingUp sx={{ mr: 0.5, fontSize: 18, transform: stats.incomeChange < 0 ? 'rotate(180deg)' : 'none' }} />
+                                    <Typography variant="body2">
+                                        {stats.incomeChange > 0 ? '+' : ''}{stats.incomeChange.toFixed(1)}%
+                                    </Typography>
+                                </Box>
+                                <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                                    income vs last {dashboardTimeframe === 'daily' ? 'day' : dashboardTimeframe.replace('ly', '')}
                                 </Typography>
                             </Box>
-                            <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                                income vs last {dashboardTimeframe === 'daily' ? 'day' : dashboardTimeframe.replace('ly', '')}
-                            </Typography>
-                        </Box>
-                    </GradientCard>
+                        </GradientCard>
+                    )}
                 </Grid>
 
                 {/* Quick Stats or Actions */}
@@ -138,10 +143,12 @@ export default function Dashboard() {
                     </Box>
                     <Card sx={{ borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
                         <CardContent sx={{ p: 0 }}>
-                            {loading ? (
-                                <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-                                    <CircularProgress size={24} />
-                                </Box>
+                            {isInitialLoading ? (
+                                <List disablePadding>
+                                    <TransactionItemSkeleton />
+                                    <TransactionItemSkeleton />
+                                    <TransactionItemSkeleton />
+                                </List>
                             ) : (errors.transactions || errors.wallets || errors.bills) ? (
                                 <Box sx={{ p: 2, textAlign: 'center' }}>
                                     <Typography color="error" variant="caption">

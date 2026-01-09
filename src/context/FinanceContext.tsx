@@ -20,6 +20,7 @@ import { type Category, categoryService } from "../services/categoryService";
 import { currencyService, type Currency } from "../services/currencyService";
 import { processDueBills, hasDueBills } from "../services/billProcessingService";
 import { showBillNotifications } from "../services/notificationService";
+import { cacheService } from "../services/cacheService";
 
 
 export type DashboardTimeframe = 'daily' | 'weekly' | 'monthly' | 'yearly';
@@ -55,7 +56,10 @@ interface FinanceContextType {
     hasMoreTransactions: boolean;
     loadMoreBills: () => void;
     hasMoreBills: boolean;
+    refreshData: () => void;
+    isInitialLoading: boolean;
 }
+
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
@@ -75,8 +79,14 @@ export const useTransactions = () => {
 
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [dashboardTimeframe, setDashboardTimeframe] = useState<DashboardTimeframe>('monthly');
+    const [user, setUser] = useState(auth.currentUser);
+
+    // Helper to get cache key
+    const getCacheKey = (key: string) => user ? `${user.uid}_${key}` : null;
+
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [transactionLimit, setTransactionLimit] = useState(50);
+
     const [hasMoreTransactions, setHasMoreTransactions] = useState(true);
 
     const loadMoreTransactions = () => {
@@ -105,6 +115,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
 
     const [loading, setLoading] = useState(true);
+    // isInitialLoading is true only if we have no data at all (neither cached nor fresh)
+    const [isInitialLoading, setIsInitialLoading] = useState(true);
+
     const [errors, setErrors] = useState<{
         transactions: string | null;
         wallets: string | null;
@@ -112,7 +125,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         categories: string | null;
     }>({ transactions: null, wallets: null, bills: null, categories: null });
 
-    const [user, setUser] = useState(auth.currentUser);
+    // Force refresh: invalidate cache and reload window (simplest way to reset all listeners/states)
+    const refreshData = () => {
+        if (user) {
+            cacheService.invalidateAll();
+            window.location.reload();
+        }
+    };
 
     useEffect(() => {
         const unsubscribe = auth.onAuthStateChanged((u) => {
@@ -124,8 +143,79 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 setCategories([]);
                 setErrors({ transactions: null, wallets: null, bills: null, categories: null });
                 setLoading(false);
+                setIsInitialLoading(false);
             } else {
-                setLoading(true);
+                // User logged in. Try to load from cache first.
+                const cachedTxs = cacheService.get<Transaction[]>(`${u.uid}_transactions`);
+                const cachedWallets = cacheService.get<Wallet[]>(`${u.uid}_wallets`);
+                const cachedBills = cacheService.get<Bill[]>(`${u.uid}_bills`);
+                const cachedCats = cacheService.get<Category[]>(`${u.uid}_categories`);
+
+                if (cachedTxs) {
+                    setTransactions(cachedTxs.map(t => {
+                        const rawCreatedAt = (t as any).createdAt;
+                        let createdAtTimestamp: Timestamp;
+
+                        // Reconstruct Timestamp from stored object { seconds, nanoseconds } or string
+                        if (rawCreatedAt && typeof rawCreatedAt.seconds === 'number') {
+                            createdAtTimestamp = new Timestamp(rawCreatedAt.seconds, rawCreatedAt.nanoseconds);
+                        } else {
+                            // Fallback if missing or invalid (e.g. create a new one or parse string if it was stringified to ISO)
+                            // Usually JSON.stringify(timestamp) might produce something else? 
+                            // Firestore Timestamp toJSON() returns { seconds, nanoseconds }
+                            createdAtTimestamp = Timestamp.now();
+                        }
+
+                        return {
+                            ...t,
+                            date: new Date(t.date),
+                            createdAt: createdAtTimestamp
+                        };
+                    }));
+                }
+
+                if (cachedWallets) {
+                    setWallets(cachedWallets.map(w => ({
+                        ...w,
+                        createdAt: (w.createdAt && (w.createdAt as any).seconds)
+                            ? new Timestamp((w.createdAt as any).seconds, (w.createdAt as any).nanoseconds)
+                            : Timestamp.now()
+                    })));
+                }
+
+                if (cachedBills) {
+                    setBills(cachedBills.map(b => ({
+                        ...b,
+                        dueDate: new Date(b.dueDate),
+                        createdAt: (b.createdAt && (b.createdAt as any).seconds)
+                            ? new Timestamp((b.createdAt as any).seconds, (b.createdAt as any).nanoseconds)
+                            : Timestamp.now(),
+                        lastGeneratedDueDate: b.lastGeneratedDueDate ? (
+                            (b.lastGeneratedDueDate as any).seconds
+                                ? new Timestamp((b.lastGeneratedDueDate as any).seconds, (b.lastGeneratedDueDate as any).nanoseconds)
+                                : new Date(b.lastGeneratedDueDate as any)
+                        ) : undefined
+                    })));
+
+                }
+                if (cachedCats) {
+                    setCategories(cachedCats.map(c => ({
+                        ...c,
+                        createdAt: (c.createdAt && (c.createdAt as any).seconds)
+                            ? new Timestamp((c.createdAt as any).seconds, (c.createdAt as any).nanoseconds)
+                            : undefined
+                    })));
+                }
+
+
+                // If we have some cached data, we are not in "initial loading" state visually
+                if (cachedTxs || cachedWallets) {
+                    setLoading(false); // Don't show global spinner if we have something
+                    setIsInitialLoading(false); // We have skeletons or data
+                } else {
+                    setLoading(true);
+                    setIsInitialLoading(true);
+                }
             }
         });
         return unsubscribe;
@@ -158,13 +248,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 return { id: doc.id, ...rawData, date: isNaN(txDate.getTime()) ? new Date() : txDate } as Transaction;
             });
             setTransactions(data);
+            // Update cache
+            if (data.length > 0) {
+                cacheService.set(getCacheKey('transactions')!, data);
+            }
             setHasMoreTransactions(data.length >= transactionLimit);
             setErrors(prev => ({ ...prev, transactions: null }));
             setLoading(false);
+            setIsInitialLoading(false);
         }, (err) => {
             console.error("FIREBASE ERROR (Transactions):", err.message);
             setErrors(prev => ({ ...prev, transactions: err.message }));
             setLoading(false);
+            setIsInitialLoading(false);
         });
 
         return unsub;
@@ -181,7 +277,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             limit(50)
         );
         const unsub = onSnapshot(walletQuery, (qs) => {
-            setWallets(qs.docs.map(doc => ({ id: doc.id, ...doc.data() } as Wallet)));
+            const data = qs.docs.map(doc => ({ id: doc.id, ...doc.data() } as Wallet));
+            setWallets(data);
+            if (data.length > 0) cacheService.set(getCacheKey('wallets')!, data);
             setErrors(prev => ({ ...prev, wallets: null }));
         }, (err) => {
             console.error("FIREBASE ERROR (Wallets):", err.message);
@@ -218,6 +316,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
             const sortedBills = fetchedBills.sort((a, b) => b.dueDate.getTime() - a.dueDate.getTime());
             setBills(sortedBills);
+            if (sortedBills.length > 0) cacheService.set(getCacheKey('bills')!, sortedBills);
             setHasMoreBills(fetchedBills.length >= billsLimit);
             setErrors(prev => ({ ...prev, bills: null }));
         }, (err) => {
@@ -247,7 +346,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 id: `default-${index}`,
                 ...cat
             } as Category));
-            setCategories([...defaultCategories, ...userCategories]);
+            const allCategories = [...defaultCategories, ...userCategories];
+            setCategories(allCategories);
+            if (allCategories.length > 0) cacheService.set(getCacheKey('categories')!, allCategories);
             setErrors(prev => ({ ...prev, categories: null }));
         }, (err) => {
             console.error("FIREBASE ERROR (Categories):", err.message);
@@ -417,8 +518,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             loadMoreTransactions,
             hasMoreTransactions,
             loadMoreBills,
-            hasMoreBills
+            hasMoreBills,
+            refreshData,
+            isInitialLoading
         }}>
+
             {children}
         </FinanceContext.Provider>
     );

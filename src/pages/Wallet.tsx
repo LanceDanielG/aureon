@@ -12,6 +12,8 @@ import {
 } from "@mui/material";
 import { Add, AccountBalance, Payments, CheckCircle, Download, CreditCard, Savings, Wallet as WalletIcon, AttachMoney } from "@mui/icons-material";
 import { getMaterialIcon } from "../components/Common/CategoryIcon";
+import { WalletCardSkeleton, BillTableRowSkeleton } from "../components/Common/Skeletons";
+
 import ExportDialog from "../components/Common/ExportDialog";
 import { useFinance } from "../context/FinanceContext";
 import { walletService } from "../services/walletService";
@@ -33,8 +35,9 @@ const getWalletIcon = (iconName: string) => {
 };
 
 export default function Wallet() {
-    const { wallets, bills, categories, loading, errors, baseCurrency, availableCurrencies, exchangeRates, loadMoreBills, hasMoreBills } = useFinance();
+    const { wallets, bills, categories, loading, isInitialLoading, errors, baseCurrency, availableCurrencies, exchangeRates, loadMoreBills, hasMoreBills } = useFinance();
     const [walletOpen, setWalletOpen] = useState(false);
+
     const [billOpen, setBillOpen] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
@@ -276,7 +279,13 @@ export default function Wallet() {
                 <Grid size={{ xs: 12 }}>
                     <Typography variant="h6" fontWeight="bold" gutterBottom>Your Wallets</Typography>
                     <Grid container spacing={2}>
-                        {loading ? (
+                        {isInitialLoading ? (
+                            Array.from(new Array(3)).map((_, i) => (
+                                <Grid size={{ xs: 12, md: 4, lg: 3 }} key={i}>
+                                    <WalletCardSkeleton />
+                                </Grid>
+                            ))
+                        ) : loading ? (
                             <Box sx={{ p: 4, width: '100%', textAlign: 'center' }}><CircularProgress size={24} /></Box>
                         ) : errors.wallets ? (
                             <Box sx={{ p: 4, width: '100%', textAlign: 'center' }}>
@@ -427,7 +436,28 @@ export default function Wallet() {
                     {/* Responsive Bills View */}
                     <Card sx={{ borderRadius: '16px', boxShadow: 'none', border: '1px solid', borderColor: 'divider' }}>
                         <CardContent sx={{ p: 0 }}>
-                            {loading ? (
+                            {isInitialLoading ? (
+                                <TableContainer>
+                                    <Table sx={{ minWidth: 600 }}>
+                                        <TableHead sx={{ bgcolor: 'rgba(241, 245, 249, 0.5)' }}>
+                                            <TableRow>
+                                                <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Due Date</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold' }}>Description</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold' }}>Category</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold' }}>Frequency</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold' }} align="right">Amount</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold' }} align="center">Status</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold' }} align="right">Action</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            <BillTableRowSkeleton />
+                                            <BillTableRowSkeleton />
+                                            <BillTableRowSkeleton />
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            ) : loading ? (
                                 <Box sx={{ p: 4, display: 'flex', justifyContent: 'center' }}><CircularProgress size={24} /></Box>
                             ) : errors.bills ? (
                                 <Box sx={{ p: 4, textAlign: 'center' }}>

@@ -11,12 +11,15 @@ import { useFinance } from "../context/FinanceContext";
 import { currencyService, type Currency } from "../services/currencyService";
 import { categoryService, findSuggestion } from "../services/categoryService";
 import CategoryIcon, { getMaterialIcon } from "../components/Common/CategoryIcon";
+import { TransactionItemSkeleton, TransactionTableRowSkeleton } from "../components/Common/Skeletons";
 import ExportDialog from "../components/Common/ExportDialog";
 
 
+
 export default function Activity() {
-    const { transactions, wallets, categories, loading, errors, availableCurrencies, exchangeRates, baseCurrency, loadMoreTransactions, hasMoreTransactions } = useFinance();
+    const { transactions, wallets, categories, loading, isInitialLoading, errors, availableCurrencies, exchangeRates, baseCurrency, loadMoreTransactions, hasMoreTransactions } = useFinance();
     const [open, setOpen] = useState(false);
+
     const [submitting, setSubmitting] = useState(false);
     const [newTx, setNewTx] = useState({
         title: '',
@@ -366,7 +369,37 @@ export default function Activity() {
                         </Box>
                     </Box>
 
-                    {loading ? (
+                    {isInitialLoading ? (
+                        isMobile ? (
+                            <List sx={{ width: '100%', bgcolor: 'background.paper' }}>
+                                <TransactionItemSkeleton />
+                                <TransactionItemSkeleton />
+                                <TransactionItemSkeleton />
+                                <TransactionItemSkeleton />
+                                <TransactionItemSkeleton />
+                            </List>
+                        ) : (
+                            <TableContainer component={Paper} elevation={0}>
+                                <Table sx={{ minWidth: 650 }}>
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell>Date</TableCell>
+                                            <TableCell>Description</TableCell>
+                                            <TableCell>Category</TableCell>
+                                            <TableCell align="right">Amount</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        <TransactionTableRowSkeleton />
+                                        <TransactionTableRowSkeleton />
+                                        <TransactionTableRowSkeleton />
+                                        <TransactionTableRowSkeleton />
+                                        <TransactionTableRowSkeleton />
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        )
+                    ) : loading ? (
                         <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
                             <CircularProgress size={32} />
                         </Box>

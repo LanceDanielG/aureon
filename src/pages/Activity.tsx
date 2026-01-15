@@ -417,12 +417,12 @@ export default function Activity() {
                 }
             />
 
-            <Card sx={{ borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
-                <CardContent>
-                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', lg: 'center' }, gap: 2, mb: 3 }}>
-                        <Typography variant="h6">Transactions</Typography>
+            <Card sx={{ borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', overflow: 'hidden' }}>
+                <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
+                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', lg: 'center' }, gap: 3, mb: 4 }}>
+                        <Typography variant="h6" fontWeight="bold">Transactions</Typography>
 
-                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', width: { xs: '100%', lg: 'auto' } }}>
+                        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', width: { xs: '100%', lg: 'auto' } }}>
                             <TextField
                                 placeholder="Search title or subtitle..."
                                 size="small"
@@ -431,7 +431,7 @@ export default function Activity() {
                                 sx={{ bgcolor: 'background.paper', borderRadius: 1, minWidth: { xs: '100%', sm: 250 } }}
                             />
 
-                            <FormControl size="small" sx={{ minWidth: 150, bgcolor: 'background.paper', borderRadius: 1 }}>
+                            <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 150 }, bgcolor: 'background.paper', borderRadius: 1 }}>
                                 <Select
                                     value={filterCategory}
                                     onChange={(e) => setFilterCategory(e.target.value)}
@@ -444,7 +444,7 @@ export default function Activity() {
                                 </Select>
                             </FormControl>
 
-                            <FormControl size="small" sx={{ minWidth: 120, bgcolor: 'background.paper', borderRadius: 1 }}>
+                            <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 120 }, bgcolor: 'background.paper', borderRadius: 1 }}>
                                 <Select
                                     value={filterType}
                                     onChange={(e) => setFilterType(e.target.value)}
@@ -462,7 +462,7 @@ export default function Activity() {
                                 variant="outlined"
                                 onClick={() => setExportDialogOpen(true)}
                                 startIcon={<Download sx={{ fontSize: 16 }} />}
-                                sx={{ borderRadius: 2, textTransform: 'none', borderColor: '#06b6d4', color: '#06b6d4', height: 40 }}
+                                sx={{ borderRadius: 2, textTransform: 'none', borderColor: '#06b6d4', color: '#06b6d4', height: 40, width: { xs: '100%', sm: 'auto' } }}
                             >
                                 Export Report
                             </Button>

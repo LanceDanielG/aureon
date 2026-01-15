@@ -39,7 +39,7 @@ export default function GradientCard({ children, variant = 'ocean', customColor,
                 ...sx
             }}
         >
-            <CardContent sx={{ p: 4, height: '100%' }}>
+            <CardContent sx={{ p: { xs: 2.5, sm: 4 }, height: '100%' }}>
                 {children}
             </CardContent>
         </Card>

@@ -539,19 +539,19 @@ export default function Wallet() {
                 </Grid>
 
                 {/* Bills Section - Full Width Below Wallets */}
-                <Grid size={{ xs: 12 }}>
-                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2, mb: 2 }}>
+                <Grid size={{ xs: 12 }} sx={{ mt: 2 }}>
+                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', lg: 'center' }, gap: 3, mb: 4 }}>
                         <Typography variant="h6" fontWeight="bold">Scheduled Bills</Typography>
 
-                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', width: { xs: '100%', sm: 'auto' } }}>
+                        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', width: { xs: '100%', lg: 'auto' } }}>
                             <TextField
                                 placeholder="Search bills..."
                                 size="small"
                                 value={billSearch}
                                 onChange={(e) => setBillSearch(e.target.value)}
-                                sx={{ bgcolor: 'background.paper', borderRadius: 1, minWidth: 200 }}
+                                sx={{ bgcolor: 'background.paper', borderRadius: 1, minWidth: { xs: '100%', sm: 250 } }}
                             />
-                            <FormControl size="small" sx={{ minWidth: 150, bgcolor: 'background.paper', borderRadius: 1 }}>
+                            <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 150 }, bgcolor: 'background.paper', borderRadius: 1 }}>
                                 <Select
                                     value={billCategory}
                                     onChange={(e) => setBillCategory(e.target.value)}
@@ -564,7 +564,7 @@ export default function Wallet() {
                                 </Select>
                             </FormControl>
 
-                            <FormControl size="small" sx={{ minWidth: 130, bgcolor: 'background.paper', borderRadius: 1 }}>
+                            <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 130 }, bgcolor: 'background.paper', borderRadius: 1 }}>
                                 <Select
                                     value={billStatus}
                                     onChange={(e) => setBillStatus(e.target.value)}
@@ -577,7 +577,7 @@ export default function Wallet() {
                                 </Select>
                             </FormControl>
 
-                            <FormControl size="small" sx={{ minWidth: 130, bgcolor: 'background.paper', borderRadius: 1 }}>
+                            <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 130 }, bgcolor: 'background.paper', borderRadius: 1 }}>
                                 <Select
                                     value={billFrequency}
                                     onChange={(e) => setBillFrequency(e.target.value)}
@@ -592,11 +592,12 @@ export default function Wallet() {
 
                             <Button
                                 size="small"
+                                variant="outlined"
                                 onClick={() => setExportDialogOpen(true)}
-                                startIcon={<Download />}
-                                sx={{ textTransform: 'none', color: '#06b6d4', height: 40 }}
+                                startIcon={<Download sx={{ fontSize: 16 }} />}
+                                sx={{ borderRadius: 2, textTransform: 'none', borderColor: '#06b6d4', color: '#06b6d4', height: 40, width: { xs: '100%', sm: 'auto' } }}
                             >
-                                Export
+                                Export Bills
                             </Button>
                         </Box>
                     </Box>

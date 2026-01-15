@@ -32,11 +32,13 @@ export default function DashboardLayout({ children, navItems = DEFAULT_NAV_ITEMS
                 component="main"
                 sx={{
                     flexGrow: 1,
-                    p: { xs: 2, md: 3 },
-                    pt: { xs: 10, md: 3 }, // Adjusted to ~80px for balanced status bar clearance
+                    px: { xs: 3, sm: 4, md: 3 },
+                    py: { xs: 2.5, md: 3 },
+                    pt: { xs: 12, md: 3 }, // Adjusted for status bar/notch clearance
                     ml: { md: '240px' }, // Width of sidebar
                     mb: { xs: '80px', md: 0 }, // Height of mobile nav
-                    width: { md: `calc(100% - 240px)` }
+                    width: { md: `calc(100% - 240px)` },
+                    overflowX: 'hidden'
                 }}
             >
                 {children}

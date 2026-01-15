@@ -314,7 +314,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 } as Bill;
             });
 
-            const sortedBills = fetchedBills.sort((a, b) => b.dueDate.getTime() - a.dueDate.getTime());
+            // Sort: Unpaid first, then by due date (newest first)
+            const sortedBills = fetchedBills.sort((a, b) => {
+                // Unpaid bills come before paid bills
+                if (a.isPaid !== b.isPaid) {
+                    return a.isPaid ? 1 : -1;
+                }
+                // Within the same paid/unpaid group, sort by due date descending
+                return b.dueDate.getTime() - a.dueDate.getTime();
+            });
             setBills(sortedBills);
             if (sortedBills.length > 0) cacheService.set(getCacheKey('bills')!, sortedBills);
             setHasMoreBills(fetchedBills.length >= billsLimit);
@@ -393,10 +401,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             } catch (error) {
                 console.error("Error processing bills:", error);
             } finally {
-                // Add a small delay before allowing next run to let Firebase updates settle
+                // With atomic transactions, we are safer. 
+                // We keep a small delay to prevent rapid-fire triggers from snapshots 
+                // while Firestore is still broadcasting the changes.
                 setTimeout(() => {
                     isProcessingBills.current = false;
-                }, 2000);
+                }, 1000);
             }
         };
 

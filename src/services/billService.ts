@@ -6,6 +6,8 @@ import {
     where,
     orderBy,
     doc,
+    setDoc,
+    getDoc,
     updateDoc,
     deleteDoc,
     Timestamp
@@ -43,6 +45,27 @@ export const billService = {
             return { id: docRef.id, ...bill };
         } catch (error) {
             console.error("Error adding bill: ", error);
+            throw error;
+        }
+    },
+
+    // Create with deterministic ID to prevent duplicates (for recurring instances)
+    async addBillDeterministic(id: string, bill: Omit<Bill, 'id' | 'createdAt'>) {
+        try {
+            const docRef = doc(db, COLLECTION_NAME, id);
+            // Check if it already exists first (optional but safer for logging)
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                return { id: docSnap.id, ...docSnap.data() } as Bill;
+            }
+
+            await setDoc(docRef, {
+                ...bill,
+                createdAt: Timestamp.now(),
+            });
+            return { id: id, ...bill };
+        } catch (error) {
+            console.error("Error adding deterministic bill: ", error);
             throw error;
         }
     },

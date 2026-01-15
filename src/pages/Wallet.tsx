@@ -10,7 +10,7 @@ import {
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     TablePagination, Tooltip
 } from "@mui/material";
-import { Add, AccountBalance, Payments, CheckCircle, Download, CreditCard, Savings, Wallet as WalletIcon, AttachMoney } from "@mui/icons-material";
+import { Add, AccountBalance, Payments, CheckCircle, Download, CreditCard, Savings, Wallet as WalletIcon, AttachMoney, Edit as EditIcon, Delete as DeleteIcon } from "@mui/icons-material";
 import { getMaterialIcon } from "../components/Common/CategoryIcon";
 import { WalletCardSkeleton, BillTableRowSkeleton } from "../components/Common/Skeletons";
 
@@ -37,9 +37,22 @@ const getWalletIcon = (iconName: string) => {
 export default function Wallet() {
     const { wallets, bills, categories, loading, isInitialLoading, errors, baseCurrency, availableCurrencies, exchangeRates, loadMoreBills, hasMoreBills } = useFinance();
     const [walletOpen, setWalletOpen] = useState(false);
+    const [confirmWalletOpen, setConfirmWalletOpen] = useState(false);
 
     const [billOpen, setBillOpen] = useState(false);
+    const [confirmPayOpen, setConfirmPayOpen] = useState(false);
+    const [confirmBillOpen, setConfirmBillOpen] = useState(false);
+    const [confirmEditBillOpen, setConfirmEditBillOpen] = useState(false);
+    const [deleteBillOpen, setDeleteBillOpen] = useState(false);
+    const [deletingBill, setDeletingBill] = useState<Bill | null>(null);
+    const [pendingPayData, setPendingPayData] = useState<{ id: string, amount: number, currency: Currency, title: string, walletId?: string } | null>(null);
+    const [editingBill, setEditingBill] = useState<Bill | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    // New Dialog states for past-date and duplicate warnings
+    const [pastDateWarningOpen, setPastDateWarningOpen] = useState(false);
+    const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
+
+    const MAX_AMOUNT = 1000000000; // 1 Billion limit
 
     const [newWallet, setNewWallet] = useState({ name: '', balance: '', icon: 'AccountBalance', currency: 'USD' as Currency, color: '#06b6d4' });
     const [visibleWallets, setVisibleWallets] = useState(3);
@@ -129,6 +142,7 @@ export default function Wallet() {
         autoDeduct: false
     });
 
+
     const handleAddWallet = async () => {
         if (!auth.currentUser || submitting) return;
         if (!newWallet.name || !newWallet.balance) {
@@ -136,12 +150,18 @@ export default function Wallet() {
             return;
         }
 
+        setConfirmWalletOpen(true);
+    };
+
+    const handleConfirmAddWallet = async () => {
+        if (!auth.currentUser || submitting) return;
+        setConfirmWalletOpen(false);
         setSubmitting(true);
         try {
             await walletService.addWallet({
                 userId: auth.currentUser.uid,
                 name: newWallet.name,
-                balance: parseFloat(newWallet.balance),
+                balance: parseFloat(newWallet.balance.replace(/[^0-9.]/g, "") || "0"),
                 color: newWallet.color,
                 icon: newWallet.icon,
                 currency: newWallet.currency
@@ -163,12 +183,76 @@ export default function Wallet() {
             return;
         }
 
+        const amountNum = parseFloat(newBill.amount.replace(/[^0-9.]/g, "") || "0");
+        if (amountNum <= 0) {
+            toast.error("Amount must be greater than 0");
+            return;
+        }
+
+        if (amountNum > MAX_AMOUNT) {
+            toast.error(`Amount exceeds maximum limit of ${currencyService.formatClean(MAX_AMOUNT, newBill.currency)}`);
+            return;
+        }
+
         const selectedDate = new Date(newBill.dueDate);
         if (isNaN(selectedDate.getTime())) {
             toast.error("Please enter a valid due date");
             return;
         }
 
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const isPastDate = selectedDate < today;
+
+        // Duplicate Check (Same title and amount within same month)
+        const isDuplicate = bills.some(b =>
+            b.title.toLowerCase() === newBill.title.toLowerCase() &&
+            b.amount === amountNum &&
+            new Date(b.dueDate).getMonth() === selectedDate.getMonth() &&
+            new Date(b.dueDate).getFullYear() === selectedDate.getFullYear() &&
+            b.id !== editingBill?.id
+        );
+
+        // Show warnings via dialogs if needed
+        if (isPastDate) {
+            setPastDateWarningOpen(true);
+            return;
+        }
+
+        if (isDuplicate) {
+            setDuplicateWarningOpen(true);
+            return;
+        }
+
+        setConfirmBillOpen(true);
+    };
+
+    const handlePastDateConfirm = () => {
+        setPastDateWarningOpen(false);
+        const selectedDate = new Date(newBill.dueDate);
+        const amountNum = parseFloat(newBill.amount.replace(/[^0-9.]/g, "") || "0");
+        const isDuplicate = bills.some(b =>
+            b.title.toLowerCase() === newBill.title.toLowerCase() &&
+            b.amount === amountNum &&
+            new Date(b.dueDate).getMonth() === selectedDate.getMonth() &&
+            new Date(b.dueDate).getFullYear() === selectedDate.getFullYear() &&
+            b.id !== editingBill?.id
+        );
+        if (isDuplicate) {
+            setDuplicateWarningOpen(true);
+        } else {
+            setConfirmBillOpen(true);
+        }
+    };
+
+    const handleDuplicateConfirm = () => {
+        setDuplicateWarningOpen(false);
+        setConfirmBillOpen(true);
+    };
+
+    const handleConfirmBill = async () => {
+        if (!auth.currentUser) return;
+        setConfirmBillOpen(false);
         setSubmitting(true);
         try {
             await billService.addBill({
@@ -176,7 +260,7 @@ export default function Wallet() {
                 title: newBill.title,
                 amount: parseFloat(newBill.amount),
                 currency: newBill.currency,
-                dueDate: selectedDate,
+                dueDate: new Date(newBill.dueDate),
                 category: newBill.category,
                 isPaid: false,
                 frequency: newBill.frequency,
@@ -185,6 +269,7 @@ export default function Wallet() {
             });
             toast.success("Bill scheduled!");
             setBillOpen(false);
+            setEditingBill(null);
             setNewBill({ title: '', amount: '', dueDate: '', category: 'Utility', currency: 'USD', frequency: 'monthly', walletId: '', autoDeduct: false });
         } catch {
             toast.error("Failed to schedule bill");
@@ -193,16 +278,98 @@ export default function Wallet() {
         }
     };
 
-    const handlePayBill = async (billId: string, amount: number, currency: Currency, title: string) => {
-        if (!auth.currentUser || submitting || wallets.length === 0) {
-            toast.error("Create a wallet first!");
+    const handleDeleteBillClick = (bill: Bill) => {
+        setDeletingBill(bill);
+        setDeleteBillOpen(true);
+    };
+
+    const handleConfirmDeleteBill = async () => {
+        if (!deletingBill || !auth.currentUser || submitting) return;
+        setSubmitting(true);
+        try {
+            await billService.deleteBill(deletingBill.id!);
+            toast.success("Bill deleted!");
+            setDeleteBillOpen(false);
+            setDeletingBill(null);
+        } catch {
+            toast.error("Failed to delete bill");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleEditBill = (bill: Bill) => {
+        setEditingBill(bill);
+        setNewBill({
+            title: bill.title,
+            amount: bill.amount.toString(),
+            dueDate: bill.dueDate.toISOString().split('T')[0],
+            category: bill.category,
+            currency: bill.currency,
+            frequency: bill.frequency,
+            walletId: bill.walletId || '',
+            autoDeduct: bill.autoDeduct
+        });
+        setBillOpen(true);
+    };
+
+    const handleUpdateBill = async () => {
+        if (!editingBill || !auth.currentUser || submitting) return;
+
+        const amountNum = parseFloat(newBill.amount.replace(/[^0-9.]/g, "") || "0");
+        if (amountNum <= 0) {
+            toast.error("Amount must be greater than 0");
             return;
         }
 
+        if (amountNum > MAX_AMOUNT) {
+            toast.error(`Amount exceeds maximum limit of ${currencyService.formatClean(MAX_AMOUNT, newBill.currency)}`);
+            return;
+        }
+
+        setConfirmEditBillOpen(true);
+    };
+
+    const handleConfirmUpdateBill = async () => {
+        if (!editingBill || !auth.currentUser || submitting) return;
+        setConfirmEditBillOpen(false);
         setSubmitting(true);
         try {
-            // Get the wallet (default to first wallet)
-            const wallet = wallets[0];
+            const amountNum = parseFloat(newBill.amount.replace(/[^0-9.]/g, "") || "0");
+            await billService.updateBill(editingBill.id!, {
+                title: newBill.title,
+                amount: amountNum,
+                currency: newBill.currency,
+                dueDate: new Date(newBill.dueDate),
+                category: newBill.category,
+                frequency: newBill.frequency,
+                walletId: newBill.walletId || undefined,
+                autoDeduct: newBill.autoDeduct
+            });
+            toast.success("Bill updated!");
+            setBillOpen(false);
+            setEditingBill(null);
+            setNewBill({ title: '', amount: '', dueDate: '', category: 'Utility', currency: 'USD', frequency: 'monthly', walletId: '', autoDeduct: false });
+        } catch {
+            toast.error("Failed to update bill");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handlePayBillClick = (billId: string, amount: number, currency: Currency, title: string, walletId?: string) => {
+        setPendingPayData({ id: billId, amount, currency, title, walletId });
+        setConfirmPayOpen(true);
+    };
+
+    const handleConfirmPay = async () => {
+        if (!pendingPayData || !auth.currentUser) return;
+        setConfirmPayOpen(false);
+        setSubmitting(true);
+        const { id, amount, currency, title, walletId: assignedWalletId } = pendingPayData;
+        try {
+            // Get the wallet (prioritize assigned wallet, default to first wallet)
+            const wallet = wallets.find(w => w.id === assignedWalletId) || wallets[0];
             if (!wallet) throw new Error("Wallet not found");
 
             const walletCurrency = wallet.currency || 'USD';
@@ -217,14 +384,14 @@ export default function Wallet() {
             // Check if wallet has sufficient balance
             if (wallet.balance < billAmount) {
                 toast.error(
-                    `Insufficient balance in ${wallet.name}. Available: ${currencyService.format(wallet.balance, walletCurrency)}, Need: ${currencyService.format(billAmount, walletCurrency)}`
+                    `Insufficient balance in ${wallet.name}. Available: ${currencyService.formatClean(wallet.balance, walletCurrency)}, Need: ${currencyService.formatClean(billAmount, walletCurrency)}`
                 );
                 setSubmitting(false);
                 return;
             }
 
             // 1. Mark bill as paid
-            await billService.updateBill(billId, { isPaid: true });
+            await billService.updateBill(id, { isPaid: true });
 
             // 2. Create transaction
             await transactionService.addTransactionWithWallet({
@@ -323,7 +490,7 @@ export default function Wallet() {
                                             {getWalletIcon(wallet.icon)}
                                         </Box>
                                         <Box sx={{ overflow: 'hidden', minWidth: 0 }}>
-                                            <Tooltip title={currencyService.format(wallet.balance, walletCurrency)} arrow placement="bottom">
+                                            <Tooltip title={currencyService.formatClean(wallet.balance, walletCurrency)} arrow placement="bottom">
                                                 <Typography
                                                     variant="h4"
                                                     fontWeight="bold"
@@ -445,6 +612,7 @@ export default function Wallet() {
                                                 <TableCell sx={{ fontWeight: 'bold' }}>Description</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold' }}>Category</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold' }}>Frequency</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold' }}>Wallet</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold' }} align="right">Amount</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold' }} align="center">Status</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold' }} align="right">Action</TableCell>
@@ -480,48 +648,70 @@ export default function Wallet() {
                                 <Box>
                                     {isMobile ? (
                                         <List>
-                                            {displayedBills.map((bill, index) => (
-                                                <Box key={bill.id}>
-                                                    <ListItem
-                                                        secondaryAction={
-                                                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
+                                            {displayedBills.map((bill, index) => {
+                                                const billDate = new Date(bill.dueDate);
+                                                const today = new Date();
+                                                today.setHours(0, 0, 0, 0);
+                                                billDate.setHours(0, 0, 0, 0);
+                                                const isOverdue = !bill.isPaid && billDate < today;
+
+                                                return (
+                                                    <Box key={bill.id}>
+                                                        <ListItem
+                                                            sx={{
+                                                                opacity: bill.isPaid ? 0.5 : 1,
+                                                                borderLeft: isOverdue ? '4px solid #ef4444' : 'none',
+                                                                bgcolor: isOverdue ? 'rgba(239, 68, 68, 0.05)' : 'transparent',
+                                                                flexDirection: 'column',
+                                                                alignItems: 'stretch',
+                                                                py: 2
+                                                            }}
+                                                        >
+                                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                                                                <Box>
+                                                                    <Typography fontWeight="bold">{bill.title}</Typography>
+                                                                    <Typography variant="body2" color="text.secondary">
+                                                                        Due: {bill.dueDate.toLocaleDateString()} • {currencyService.formatClean(bill.amount, bill.currency || 'USD')} • Wallet: {wallets.find(w => w.id === bill.walletId)?.name || 'None'}
+                                                                    </Typography>
+                                                                </Box>
                                                                 {bill.isPaid ? (
                                                                     <Chip icon={<CheckCircle />} label="Paid" color="success" size="small" variant="outlined" />
-                                                                ) : ((() => {
-                                                                    const billDate = new Date(bill.dueDate);
-                                                                    const today = new Date();
-                                                                    today.setHours(0, 0, 0, 0);
-                                                                    billDate.setHours(0, 0, 0, 0);
-                                                                    return billDate < today;
-                                                                })()) ? (
-                                                                    <Chip label="Overdue" color="error" size="small" variant="outlined" />
+                                                                ) : isOverdue ? (
+                                                                    <Chip label="Overdue" color="error" size="small" variant="filled" />
                                                                 ) : (
-                                                                    <Chip label="Pending" color="warning" size="small" variant="outlined" />
-                                                                )}
-
-                                                                {!bill.isPaid && (
-                                                                    <Button
-                                                                        size="small"
-                                                                        variant="contained"
-                                                                        onClick={() => handlePayBill(bill.id!, bill.amount, bill.currency || 'USD', bill.title)}
-                                                                        disabled={submitting}
-                                                                        sx={{ bgcolor: '#06b6d4' }}
-                                                                    >
-                                                                        Pay
-                                                                    </Button>
+                                                                    <Chip label="Pending" color="warning" size="small" variant="filled" />
                                                                 )}
                                                             </Box>
-                                                        }
-                                                    >
-                                                        <ListItemText
-                                                            primary={bill.title}
-                                                            secondary={`Due: ${bill.dueDate.toLocaleDateString()} • ${currencyService.format(bill.amount, bill.currency || 'USD')}`}
-                                                            primaryTypographyProps={{ fontWeight: 'bold' }}
-                                                        />
-                                                    </ListItem>
-                                                    {index < displayedBills.length - 1 && <Divider />}
-                                                </Box>
-                                            ))}
+                                                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1, mt: 1.5, width: '100%' }}>
+                                                                <Tooltip title="Edit">
+                                                                    <Button size="small" onClick={() => handleEditBill(bill)} sx={{ minWidth: 'auto', p: 1, color: '#06b6d4' }}>
+                                                                        <EditIcon fontSize="small" />
+                                                                    </Button>
+                                                                </Tooltip>
+                                                                <Tooltip title="Delete">
+                                                                    <Button size="small" onClick={() => handleDeleteBillClick(bill)} sx={{ minWidth: 'auto', p: 1, color: '#ef4444' }}>
+                                                                        <DeleteIcon fontSize="small" />
+                                                                    </Button>
+                                                                </Tooltip>
+                                                                <Box sx={{ width: 60, display: 'flex', justifyContent: 'center' }}>
+                                                                    {!bill.isPaid && (
+                                                                        <Button
+                                                                            size="small"
+                                                                            variant="contained"
+                                                                            onClick={() => handlePayBillClick(bill.id!, bill.amount, bill.currency || 'USD', bill.title, bill.walletId)}
+                                                                            disabled={submitting}
+                                                                            sx={{ bgcolor: '#06b6d4', minWidth: 'auto', px: 2 }}
+                                                                        >
+                                                                            Pay
+                                                                        </Button>
+                                                                    )}
+                                                                </Box>
+                                                            </Box>
+                                                        </ListItem>
+                                                        {index < displayedBills.length - 1 && <Divider />}
+                                                    </Box>
+                                                );
+                                            })}
                                         </List>
                                     ) : (
                                         <TableContainer>
@@ -532,9 +722,10 @@ export default function Wallet() {
                                                         <TableCell sx={{ fontWeight: 'bold' }}>Description</TableCell>
                                                         <TableCell sx={{ fontWeight: 'bold' }}>Category</TableCell>
                                                         <TableCell sx={{ fontWeight: 'bold' }}>Frequency</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold' }}>Wallet</TableCell>
                                                         <TableCell sx={{ fontWeight: 'bold' }} align="right">Amount</TableCell>
                                                         <TableCell sx={{ fontWeight: 'bold' }} align="center">Status</TableCell>
-                                                        <TableCell sx={{ fontWeight: 'bold' }} align="right">Action</TableCell>
+                                                        <TableCell sx={{ fontWeight: 'bold', minWidth: 150 }} align="right">Action</TableCell>
                                                     </TableRow>
                                                 </TableHead>
                                                 <TableBody>
@@ -549,7 +740,16 @@ export default function Wallet() {
                                                         const catObj = categories.find(c => c.name === bill.category) || { name: bill.category, icon: 'receipt_long', color: '#64748b', bgColor: '#f1f5f9' };
 
                                                         return (
-                                                            <TableRow key={bill.id} hover sx={{ '& td': { py: 2 } }}>
+                                                            <TableRow
+                                                                key={bill.id}
+                                                                hover
+                                                                sx={{
+                                                                    '& td': { py: 2 },
+                                                                    opacity: bill.isPaid ? 0.5 : 1,
+                                                                    borderLeft: isOverdue ? '4px solid #ef4444' : 'none',
+                                                                    bgcolor: isOverdue ? 'rgba(239, 68, 68, 0.05)' : 'transparent'
+                                                                }}
+                                                            >
                                                                 <TableCell>
                                                                     {bill.dueDate.toLocaleDateString()}
                                                                 </TableCell>
@@ -563,14 +763,14 @@ export default function Wallet() {
                                                                                 width: 24,
                                                                                 height: 24,
                                                                                 borderRadius: '50%',
-                                                                                bgcolor: (catObj as any).bgColor || '#f1f5f9',
-                                                                                color: (catObj as any).color || '#64748b',
+                                                                                bgcolor: catObj.bgColor || '#f1f5f9',
+                                                                                color: catObj.color || '#64748b',
                                                                                 display: 'flex',
                                                                                 alignItems: 'center',
                                                                                 justifyContent: 'center'
                                                                             }}
                                                                         >
-                                                                            {getMaterialIcon((catObj as any).icon || 'receipt_long')}
+                                                                            {getMaterialIcon(catObj.icon || 'receipt_long')}
                                                                         </Box>
                                                                         <Typography variant="body2">{bill.category}</Typography>
                                                                     </Box>
@@ -578,9 +778,12 @@ export default function Wallet() {
                                                                 <TableCell>
                                                                     <Chip label={bill.frequency} size="small" variant="outlined" sx={{ textTransform: 'capitalize' }} />
                                                                 </TableCell>
+                                                                <TableCell>
+                                                                    <Typography variant="body2">{wallets.find(w => w.id === bill.walletId)?.name || 'None'}</Typography>
+                                                                </TableCell>
                                                                 <TableCell align="right">
                                                                     <Typography fontWeight="600">
-                                                                        {currencyService.format(bill.amount, bill.currency || 'USD')}
+                                                                        {currencyService.formatClean(bill.amount, bill.currency || 'USD')}
                                                                     </Typography>
                                                                 </TableCell>
                                                                 <TableCell align="center">
@@ -593,17 +796,31 @@ export default function Wallet() {
                                                                     )}
                                                                 </TableCell>
                                                                 <TableCell align="right">
-                                                                    {!bill.isPaid && (
-                                                                        <Button
-                                                                            size="small"
-                                                                            variant="contained"
-                                                                            onClick={() => handlePayBill(bill.id!, bill.amount, bill.currency || 'USD', bill.title)}
-                                                                            disabled={submitting}
-                                                                            sx={{ bgcolor: '#06b6d4', minWidth: 'auto', px: 2 }}
-                                                                        >
-                                                                            Pay
-                                                                        </Button>
-                                                                    )}
+                                                                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 0.5 }}>
+                                                                        <Tooltip title="Edit">
+                                                                            <Button size="small" onClick={() => handleEditBill(bill)} sx={{ minWidth: 'auto', p: 1, color: '#06b6d4' }}>
+                                                                                <EditIcon fontSize="small" />
+                                                                            </Button>
+                                                                        </Tooltip>
+                                                                        <Tooltip title="Delete">
+                                                                            <Button size="small" onClick={() => handleDeleteBillClick(bill)} sx={{ minWidth: 'auto', p: 1, color: '#ef4444' }}>
+                                                                                <DeleteIcon fontSize="small" />
+                                                                            </Button>
+                                                                        </Tooltip>
+                                                                        <Box sx={{ width: 56, display: 'flex', justifyContent: 'center' }}>
+                                                                            {!bill.isPaid && (
+                                                                                <Button
+                                                                                    size="small"
+                                                                                    variant="contained"
+                                                                                    onClick={() => handlePayBillClick(bill.id!, bill.amount, bill.currency || 'USD', bill.title, bill.walletId)}
+                                                                                    disabled={submitting}
+                                                                                    sx={{ bgcolor: '#06b6d4', minWidth: 'auto', px: 2 }}
+                                                                                >
+                                                                                    Pay
+                                                                                </Button>
+                                                                            )}
+                                                                        </Box>
+                                                                    </Box>
                                                                 </TableCell>
                                                             </TableRow>
                                                         );
@@ -686,10 +903,15 @@ export default function Wallet() {
                         </FormControl>
                         <TextField
                             label="Initial Balance"
-                            type="number"
+                            type="text"
                             fullWidth
                             value={newWallet.balance}
-                            onChange={(e) => setNewWallet({ ...newWallet, balance: e.target.value })}
+                            onChange={(e) => {
+                                const val = e.target.value.replace(/[^0-9.]/g, "");
+                                const dotCount = (val.match(/\./g) || []).length;
+                                if (dotCount > 1) return;
+                                setNewWallet({ ...newWallet, balance: val });
+                            }}
                         />
                         <Box>
                             <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1 }}>
@@ -774,8 +996,8 @@ export default function Wallet() {
             </Dialog>
 
             {/* Bill Dialog */}
-            <Dialog open={billOpen} onClose={() => setBillOpen(false)} fullWidth maxWidth="xs">
-                <DialogTitle>Schedule a Bill</DialogTitle>
+            <Dialog open={billOpen} onClose={() => { setBillOpen(false); setEditingBill(null); }} fullWidth maxWidth="xs">
+                <DialogTitle>{editingBill ? 'Edit Bill' : 'Schedule a Bill'}</DialogTitle>
                 <DialogContent>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
                         <TextField
@@ -800,10 +1022,15 @@ export default function Wallet() {
                         </FormControl>
                         <TextField
                             label="Amount"
-                            type="number"
+                            type="text"
                             fullWidth
                             value={newBill.amount}
-                            onChange={(e) => setNewBill({ ...newBill, amount: e.target.value })}
+                            onChange={(e) => {
+                                const val = e.target.value.replace(/[^0-9.]/g, "");
+                                const dotCount = (val.match(/\./g) || []).length;
+                                if (dotCount > 1) return;
+                                setNewBill({ ...newBill, amount: val });
+                            }}
                         />
                         <TextField
                             label="Due Date"
@@ -857,14 +1084,149 @@ export default function Wallet() {
                     </Box>
                 </DialogContent>
                 <DialogActions sx={{ p: 3 }}>
-                    <Button onClick={() => setBillOpen(false)}>Cancel</Button>
+                    <Button onClick={() => { setBillOpen(false); setEditingBill(null); }} sx={{ color: 'text.secondary' }}>Cancel</Button>
                     <Button
                         variant="contained"
-                        onClick={handleAddBill}
+                        onClick={editingBill ? handleUpdateBill : handleAddBill}
                         disabled={submitting}
-                        sx={{ bgcolor: '#06b6d4' }}
+                        sx={{ bgcolor: '#06b6d4', '&:hover': { bgcolor: '#0891b2' } }}
                     >
-                        Schedule
+                        {editingBill ? 'Update Bill' : 'Schedule Bill'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Wallet Confirmation Dialog */}
+            <Dialog open={confirmWalletOpen} onClose={() => setConfirmWalletOpen(false)} maxWidth="xs" fullWidth>
+                <DialogTitle>Confirm New Wallet</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Are you sure you want to create a new wallet named <strong>{newWallet.name}</strong> with a starting balance of <strong>{currencyService.formatClean(parseFloat(newWallet.balance) || 0, newWallet.currency)}</strong>?
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ p: 3 }}>
+                    <Button onClick={() => setConfirmWalletOpen(false)}>Cancel</Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleConfirmAddWallet}
+                        sx={{ bgcolor: '#06b6d4', '&:hover': { bgcolor: '#0891b2' } }}
+                    >
+                        Confirm
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Confirm Bill Dialog */}
+            <Dialog open={confirmBillOpen} onClose={() => setConfirmBillOpen(false)} maxWidth="xs" fullWidth>
+                <DialogTitle>Confirm Scheduled Bill</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Are you sure you want to schedule <strong>{newBill.title}</strong> for <strong>{currencyService.formatClean(parseFloat(newBill.amount) || 0, newBill.currency)}</strong>?
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ p: 3 }}>
+                    <Button onClick={() => setConfirmBillOpen(false)}>Cancel</Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleConfirmBill}
+                        sx={{ bgcolor: '#06b6d4', '&:hover': { bgcolor: '#0891b2' } }}
+                    >
+                        Confirm
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Confirm Pay Dialog */}
+            <Dialog open={confirmPayOpen} onClose={() => setConfirmPayOpen(false)} maxWidth="xs" fullWidth>
+                <DialogTitle>Confirm Bill Payment</DialogTitle>
+                <DialogContent>
+                    {pendingPayData && (
+                        <Typography>
+                            Are you sure you want to pay <strong>{pendingPayData.title}</strong> of <strong>{currencyService.formatClean(pendingPayData.amount, pendingPayData.currency)}</strong> from your primary wallet?
+                        </Typography>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ p: 3 }}>
+                    <Button onClick={() => setConfirmPayOpen(false)}>Cancel</Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleConfirmPay}
+                        sx={{ bgcolor: '#06b6d4', '&:hover': { bgcolor: '#0891b2' } }}
+                    >
+                        Confirm Payment
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Edit Bill Confirmation Dialog */}
+            <Dialog open={confirmEditBillOpen} onClose={() => setConfirmEditBillOpen(false)} maxWidth="xs" fullWidth>
+                <DialogTitle>Confirm Changes</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Are you sure you want to save changes to <strong>{editingBill?.title}</strong>?
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ p: 3 }}>
+                    <Button onClick={() => setConfirmEditBillOpen(false)}>Cancel</Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleConfirmUpdateBill}
+                        sx={{ bgcolor: '#06b6d4', '&:hover': { bgcolor: '#0891b2' } }}
+                    >
+                        Save Changes
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Delete Bill Confirmation */}
+            <Dialog open={deleteBillOpen} onClose={() => !submitting && setDeleteBillOpen(false)} maxWidth="xs" fullWidth>
+                <DialogTitle sx={{ color: '#ef4444', fontWeight: 'bold' }}>Delete Scheduled Bill</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Are you sure you want to delete the scheduled bill <strong>{deletingBill?.title}</strong>?
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ p: 3 }}>
+                    <Button onClick={() => setDeleteBillOpen(false)} disabled={submitting}>Cancel</Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleConfirmDeleteBill}
+                        disabled={submitting}
+                        color="error"
+                    >
+                        {submitting ? <CircularProgress size={20} color="inherit" /> : 'Delete'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Past Date Warning Dialog */}
+            <Dialog open={pastDateWarningOpen} onClose={() => setPastDateWarningOpen(false)} maxWidth="xs" fullWidth>
+                <DialogTitle sx={{ color: '#f59e0b', fontWeight: 'bold' }}>Past Due Date</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        The due date you selected is in the past. Are you sure you want to schedule this bill?
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ p: 3 }}>
+                    <Button onClick={() => setPastDateWarningOpen(false)}>Cancel</Button>
+                    <Button variant="contained" onClick={handlePastDateConfirm} sx={{ bgcolor: '#f59e0b', '&:hover': { bgcolor: '#d97706' } }}>
+                        Continue
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Duplicate Warning Dialog */}
+            <Dialog open={duplicateWarningOpen} onClose={() => setDuplicateWarningOpen(false)} maxWidth="xs" fullWidth>
+                <DialogTitle sx={{ color: '#f59e0b', fontWeight: 'bold' }}>Possible Duplicate</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        A bill titled "<strong>{newBill.title}</strong>" with the same amount already exists for this month. Continue anyway?
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ p: 3 }}>
+                    <Button onClick={() => setDuplicateWarningOpen(false)}>Cancel</Button>
+                    <Button variant="contained" onClick={handleDuplicateConfirm} sx={{ bgcolor: '#f59e0b', '&:hover': { bgcolor: '#d97706' } }}>
+                        Continue
                     </Button>
                 </DialogActions>
             </Dialog>

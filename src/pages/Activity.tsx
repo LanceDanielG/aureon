@@ -19,6 +19,13 @@ import ExportDialog from "../components/Common/ExportDialog";
 export default function Activity() {
     const { transactions, wallets, categories, loading, isInitialLoading, errors, availableCurrencies, exchangeRates, baseCurrency, loadMoreTransactions, hasMoreTransactions } = useFinance();
     const [open, setOpen] = useState(false);
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [confirmEditOpen, setConfirmEditOpen] = useState(false);
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
+    const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+
+    const MAX_AMOUNT = 1000000000; // 1 Billion limit
 
     const [submitting, setSubmitting] = useState(false);
     const [newTx, setNewTx] = useState({
@@ -133,6 +140,18 @@ export default function Activity() {
             return;
         }
 
+        const amountNum = Math.abs(parseFloat(newTx.amount.replace(/[^0-9.]/g, "") || "0"));
+        if (amountNum > MAX_AMOUNT) {
+            toast.error(`Amount exceeds maximum limit of ${currencyService.formatClean(MAX_AMOUNT, newTx.currency)}`);
+            return;
+        }
+
+        setConfirmOpen(true);
+    };
+
+    const handleConfirmAdd = async () => {
+        if (!auth.currentUser) return;
+        setConfirmOpen(false);
         setSubmitting(true);
         try {
             // Handle wallet-to-wallet transfer
@@ -171,7 +190,7 @@ export default function Activity() {
                 // Check source wallet balance
                 if (sourceWallet.balance < sourceAmount) {
                     toast.error(
-                        `Insufficient balance in ${sourceWallet.name}. Available: ${currencyService.format(sourceWallet.balance, sourceCurrency)}, Need: ${currencyService.format(sourceAmount, sourceCurrency)}`
+                        `Insufficient balance in ${sourceWallet.name}. Available: ${currencyService.formatClean(sourceWallet.balance, sourceCurrency)}, Need: ${currencyService.formatClean(sourceAmount, sourceCurrency)}`
                     );
                     setSubmitting(false);
                     return;
@@ -179,7 +198,7 @@ export default function Activity() {
 
                 // Create expense transaction from source wallet
                 await transactionService.addTransactionWithWallet({
-                    userId: auth.currentUser.uid,
+                    userId: auth.currentUser!.uid,
                     title: `Transfer to ${destWallet.name}`,
                     subtitle: newTx.subtitle || 'Wallet Transfer',
                     amount: -sourceAmount,
@@ -201,7 +220,7 @@ export default function Activity() {
                 }
 
                 await transactionService.addTransactionWithWallet({
-                    userId: auth.currentUser.uid,
+                    userId: auth.currentUser!.uid,
                     title: `Transfer from ${sourceWallet.name}`,
                     subtitle: newTx.subtitle || 'Wallet Transfer',
                     amount: destAmount,
@@ -240,7 +259,7 @@ export default function Activity() {
 
                     if (selectedWallet.balance < expenseAmount) {
                         toast.error(
-                            `Insufficient balance in ${selectedWallet.name}. Available: ${currencyService.format(selectedWallet.balance, walletCurrency)}, Required: ${currencyService.format(expenseAmount, walletCurrency)}`
+                            `Insufficient balance in ${selectedWallet.name}. Available: ${currencyService.formatClean(selectedWallet.balance, walletCurrency)}, Required: ${currencyService.formatClean(expenseAmount, walletCurrency)}`
                         );
                         setSubmitting(false);
                         return;
@@ -249,7 +268,7 @@ export default function Activity() {
             }
 
             await transactionService.addTransactionWithWallet({
-                userId: auth.currentUser.uid,
+                userId: auth.currentUser!.uid,
                 title: newTx.title,
                 subtitle: newTx.subtitle,
                 amount: amountValue,
@@ -270,14 +289,95 @@ export default function Activity() {
         }
     };
 
+    const handleEdit = (tx: Transaction) => {
+        setEditingTransaction(tx);
+        setNewTx({
+            title: tx.title,
+            subtitle: tx.subtitle || '',
+            amount: Math.abs(tx.amount).toString(),
+            flow: tx.flow,
+            categoryId: tx.categoryId,
+            walletId: tx.walletId || '',
+            destinationWalletId: '',
+            currency: tx.currency
+        });
+        setOpen(true);
+    };
+
+    const handleUpdate = async () => {
+        if (!editingTransaction || !auth.currentUser || submitting) return;
+
+        const amountNum = Math.abs(parseFloat(newTx.amount.replace(/[^0-9.]/g, "") || "0"));
+        if (amountNum > MAX_AMOUNT) {
+            toast.error(`Amount exceeds maximum limit of ${currencyService.formatClean(MAX_AMOUNT, newTx.currency)}`);
+            return;
+        }
+
+        setConfirmEditOpen(true);
+    };
+
+    const handleConfirmUpdate = async () => {
+        if (!editingTransaction || !auth.currentUser || submitting) return;
+
+        const amountNum = Math.abs(parseFloat(newTx.amount.replace(/[^0-9.]/g, "") || "0"));
+
+        setConfirmEditOpen(false);
+        setSubmitting(true);
+        try {
+            let amountValue = amountNum;
+            if (newTx.flow === 'expense') {
+                amountValue = -amountValue;
+            }
+
+            await transactionService.updateTransaction(editingTransaction.id!, {
+                title: newTx.title,
+                subtitle: newTx.subtitle,
+                amount: amountValue,
+                flow: newTx.flow,
+                categoryId: newTx.categoryId,
+                currency: newTx.currency,
+                walletId: newTx.walletId || undefined
+            });
+
+            toast.success("Transaction updated!");
+            setOpen(false);
+            setEditingTransaction(null);
+            setNewTx({ title: '', subtitle: '', amount: '', flow: 'expense', categoryId: '', walletId: '', destinationWalletId: '', currency: 'USD' });
+        } catch {
+            toast.error("Failed to update transaction");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleDeleteClick = (tx: Transaction) => {
+        setDeletingTransaction(tx);
+        setDeleteConfirmOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!deletingTransaction || !auth.currentUser || submitting) return;
+        setSubmitting(true);
+        try {
+            await transactionService.deleteTransactionWithWallet(deletingTransaction.id!, exchangeRates);
+            toast.success("Transaction deleted!");
+            setDeleteConfirmOpen(false);
+            setDeletingTransaction(null);
+        } catch {
+            toast.error("Failed to delete transaction");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
     const handleAddCategory = async () => {
-        if (!newCategory.name) {
+        if (!newCategory.name || !auth.currentUser) {
             toast.error("Please enter a category name");
             return;
         }
 
         try {
-            await categoryService.addCategory(auth.currentUser!.uid, {
+            await categoryService.addCategory(auth.currentUser.uid, {
                 ...newCategory,
                 flow: newCategory.flow === 'transfer' ? 'expense' : newCategory.flow
             });
@@ -386,7 +486,9 @@ export default function Activity() {
                                             <TableCell>Date</TableCell>
                                             <TableCell>Description</TableCell>
                                             <TableCell>Category</TableCell>
+                                            <TableCell>Wallet</TableCell>
                                             <TableCell align="right">Amount</TableCell>
+                                            <TableCell align="right">Actions</TableCell>
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
@@ -428,9 +530,10 @@ export default function Activity() {
                                                 key={item.id}
                                                 title={item.title}
                                                 subtitle={item.subtitle || category?.name || 'General'}
+                                                walletName={wallets.find(w => w.id === item.walletId)?.name}
                                                 amount={(() => {
                                                     const num = typeof item.amount === 'number' ? item.amount : parseFloat(String(item.amount).replace(/[^0-9.-]+/g, "") || "0");
-                                                    const formatted = currencyService.format(Math.abs(num), item.currency || 'USD');
+                                                    const formatted = currencyService.formatClean(Math.abs(num), item.currency || 'USD');
                                                     return num > 0 ? `+${formatted}` : `-${formatted}`;
                                                 })()}
                                                 secondaryAmount={(() => {
@@ -439,13 +542,15 @@ export default function Activity() {
                                                     const num = typeof item.amount === 'number' ? item.amount : parseFloat(String(item.amount).replace(/[^0-9.-]+/g, "") || "0");
                                                     const amountUSD = currencyService.convertToUSD(Math.abs(num), item.currency || 'USD', exchangeRates);
                                                     const amountBase = currencyService.convertFromUSD(amountUSD, baseCur, exchangeRates);
-                                                    return currencyService.format(amountBase, baseCur);
+                                                    return currencyService.formatClean(amountBase, baseCur);
                                                 })()}
                                                 date={item.date.toLocaleDateString()}
                                                 icon={category ? getMaterialIcon(category.icon) : (item.flow === 'income' ? <CallReceived /> : <CallMade />)}
                                                 iconColor={category?.color || (item.flow === 'income' ? '#10b981' : '#ef4444')}
                                                 iconBgColor={category?.bgColor || (item.flow === 'income' ? '#ecfdf5' : '#fef2f2')}
                                                 isLast={index === displayedTransactions.length - 1}
+                                                onEdit={() => handleEdit(item)}
+                                                onDelete={() => handleDeleteClick(item)}
                                             />
                                         );
                                     })}
@@ -459,14 +564,16 @@ export default function Activity() {
                                                     <TableCell>Date</TableCell>
                                                     <TableCell>Description</TableCell>
                                                     <TableCell>Category</TableCell>
+                                                    <TableCell>Wallet</TableCell>
                                                     <TableCell align="right">Amount</TableCell>
+                                                    <TableCell align="right">Actions</TableCell>
                                                 </TableRow>
                                             </TableHead>
                                             <TableBody>
                                                 {paginatedTransactions.map((item) => {
                                                     const category = categories.find(c => c.id === item.categoryId);
                                                     const num = typeof item.amount === 'number' ? item.amount : parseFloat(String(item.amount).replace(/[^0-9.-]+/g, "") || "0");
-                                                    const amountFormatted = currencyService.format(Math.abs(num), item.currency || 'USD');
+                                                    const amountFormatted = currencyService.formatClean(Math.abs(num), item.currency || 'USD');
                                                     const isIncome = num > 0;
 
                                                     return (
@@ -501,6 +608,13 @@ export default function Activity() {
                                                                     <Typography variant="body2">{category?.name || 'General'}</Typography>
                                                                 </Box>
                                                             </TableCell>
+                                                            <TableCell>
+                                                                <Typography variant="body2">
+                                                                    {wallets.find(w => w.id === item.walletId)?.name || (
+                                                                        <Box component="span" sx={{ color: 'text.disabled', fontStyle: 'italic' }}>None</Box>
+                                                                    )}
+                                                                </Typography>
+                                                            </TableCell>
                                                             <TableCell align="right">
                                                                 <Typography
                                                                     variant="body2"
@@ -514,10 +628,16 @@ export default function Activity() {
                                                                         {(() => {
                                                                             const amountUSD = currencyService.convertToUSD(Math.abs(num), item.currency || 'USD', exchangeRates);
                                                                             const amountBase = currencyService.convertFromUSD(amountUSD, baseCurrency || 'USD', exchangeRates);
-                                                                            return `≈ ${currencyService.format(amountBase, baseCurrency || 'USD')}`;
+                                                                            return `≈ ${currencyService.formatClean(amountBase, baseCurrency || 'USD')}`;
                                                                         })()}
                                                                     </Typography>
                                                                 )}
+                                                            </TableCell>
+                                                            <TableCell align="right">
+                                                                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                                                                    <Button size="small" onClick={() => handleEdit(item)} sx={{ color: '#06b6d4' }}>Edit</Button>
+                                                                    <Button size="small" onClick={() => handleDeleteClick(item)} sx={{ color: '#ef4444' }}>Delete</Button>
+                                                                </Box>
                                                             </TableCell>
                                                         </TableRow>
                                                     );
@@ -580,9 +700,9 @@ export default function Activity() {
                 </CardContent>
             </Card>
 
-            {/* Add Transaction Dialog */}
-            <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="xs">
-                <DialogTitle>Add Transaction</DialogTitle>
+            {/* Add/Edit Transaction Dialog */}
+            <Dialog open={open} onClose={() => { setOpen(false); setEditingTransaction(null); }} fullWidth maxWidth="xs">
+                <DialogTitle>{editingTransaction ? 'Edit Transaction' : 'Add Transaction'}</DialogTitle>
                 <DialogContent>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
                         <Stack direction="row" spacing={2}>
@@ -605,7 +725,12 @@ export default function Activity() {
                                 label="Amount"
                                 type="text"
                                 value={newTx.amount}
-                                onChange={(e) => setNewTx({ ...newTx, amount: e.target.value })}
+                                onChange={(e) => {
+                                    const val = e.target.value.replace(/[^0-9.]/g, "");
+                                    const dotCount = (val.match(/\./g) || []).length;
+                                    if (dotCount > 1) return;
+                                    setNewTx({ ...newTx, amount: val });
+                                }}
                                 required
                                 placeholder="0.00"
                             />
@@ -714,15 +839,76 @@ export default function Activity() {
                     </Box>
                 </DialogContent>
                 <DialogActions sx={{ p: 3 }}>
-                    <Button onClick={() => setOpen(false)} disabled={submitting}>Cancel</Button>
+                    <Button onClick={() => { setOpen(false); setEditingTransaction(null); }} disabled={submitting}>Cancel</Button>
                     <Button
                         variant="contained"
-                        onClick={handleAdd}
+                        onClick={editingTransaction ? handleUpdate : handleAdd}
                         disabled={submitting}
                         startIcon={submitting ? <CircularProgress size={20} color="inherit" /> : null}
                         sx={{ bgcolor: '#06b6d4', '&:hover': { bgcolor: '#0891b2' } }}
                     >
-                        {submitting ? 'Adding...' : 'Add'}
+                        {submitting ? 'Processing...' : (editingTransaction ? 'Update' : 'Add')}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Confirmation Dialog */}
+            <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)} maxWidth="xs" fullWidth>
+                <DialogTitle>Confirm Transaction</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Are you sure you want to {newTx.flow === 'income' ? 'add' : 'record'} this {newTx.flow} of <strong>{currencyService.formatClean(parseFloat(newTx.amount) || 0, newTx.currency)}</strong>?
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ p: 3 }}>
+                    <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleConfirmAdd}
+                        sx={{ bgcolor: '#06b6d4', '&:hover': { bgcolor: '#0891b2' } }}
+                    >
+                        Confirm
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={deleteConfirmOpen} onClose={() => !submitting && setDeleteConfirmOpen(false)} maxWidth="xs" fullWidth>
+                <DialogTitle sx={{ color: '#ef4444', fontWeight: 'bold' }}>Delete Transaction</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Are you sure you want to delete <strong>{deletingTransaction?.title}</strong>? This will reverse its impact on your wallet balance.
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ p: 3 }}>
+                    <Button onClick={() => setDeleteConfirmOpen(false)} disabled={submitting}>Cancel</Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleConfirmDelete}
+                        disabled={submitting}
+                        color="error"
+                    >
+                        {submitting ? <CircularProgress size={20} color="inherit" /> : 'Delete'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Edit Confirmation Dialog */}
+            <Dialog open={confirmEditOpen} onClose={() => setConfirmEditOpen(false)} maxWidth="xs" fullWidth>
+                <DialogTitle>Confirm Changes</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Are you sure you want to save changes to <strong>{editingTransaction?.title}</strong>?
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ p: 3 }}>
+                    <Button onClick={() => setConfirmEditOpen(false)}>Cancel</Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleConfirmUpdate}
+                        sx={{ bgcolor: '#06b6d4', '&:hover': { bgcolor: '#0891b2' } }}
+                    >
+                        Save Changes
                     </Button>
                 </DialogActions>
             </Dialog>

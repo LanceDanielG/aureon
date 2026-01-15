@@ -1,31 +1,65 @@
-import { ListItem, ListItemAvatar, Avatar, ListItemText, Typography, Box } from '@mui/material';
+import { ListItem, ListItemAvatar, Avatar, ListItemText, Typography, Box, Button } from '@mui/material';
 import type { ReactNode } from 'react';
 
 interface TransactionItemProps {
     icon: ReactNode;
     title: string;
     subtitle: string;
+    walletName?: string;
     amount: string;
     secondaryAmount?: string;
     date?: string;
     iconColor: string;
     iconBgColor: string;
     isLast?: boolean;
+    onEdit?: () => void;
+    onDelete?: () => void;
 }
 
 export default function TransactionItem({
     icon,
     title,
     subtitle,
+    walletName,
     amount,
     secondaryAmount,
     date,
     iconColor,
     iconBgColor,
-    isLast = false
+    isLast = false,
+    onEdit,
+    onDelete
 }: TransactionItemProps) {
     return (
         <ListItem
+            secondaryAction={
+                <Box sx={{ display: 'flex', gap: 0.5 }}>
+                    {onEdit && (
+                        <Button
+                            size="small"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onEdit();
+                            }}
+                            sx={{ color: '#06b6d4', minWidth: 'auto' }}
+                        >
+                            Edit
+                        </Button>
+                    )}
+                    {onDelete && (
+                        <Button
+                            size="small"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onDelete();
+                            }}
+                            sx={{ color: '#ef4444', minWidth: 'auto' }}
+                        >
+                            Delete
+                        </Button>
+                    )}
+                </Box>
+            }
             sx={{
                 py: 2,
                 borderBottom: isLast ? 'none' : 1,
@@ -48,9 +82,17 @@ export default function TransactionItem({
                     </Typography>
                 }
                 secondary={
-                    <Typography variant="body2" color="text.secondary" noWrap>
-                        {subtitle}
-                    </Typography>
+                    <Box component="span">
+                        <Typography variant="body2" color="text.secondary" noWrap component="span" sx={{ display: 'block' }}>
+                            {subtitle}
+                        </Typography>
+                        {walletName && (
+                            <Typography variant="caption" color="primary" sx={{ fontWeight: '500', display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                                <Box component="span" sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', mr: 0.5, display: 'inline-block' }} />
+                                {walletName}
+                            </Typography>
+                        )}
+                    </Box>
                 }
                 sx={{ mr: 2, overflow: 'hidden' }}
             />

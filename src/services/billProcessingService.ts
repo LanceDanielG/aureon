@@ -69,11 +69,13 @@ export async function processDueBills(
     // Processing start point
     for (const bill of dueBills) {
         // ---------- 1. Auto-deduct payment ----------
-        // Only if not paid, auto-deduct is on, wallet is set, and it is due
+        // Only if not paid, auto-deduct is on, wallet is set, and it is due EXACTLY TODAY
+        // Overdue bills require manual payment
         const billDate = new Date(bill.dueDate);
         billDate.setHours(0, 0, 0, 0);
 
-        const isDueForPayment = !bill.isPaid && bill.autoDeduct && bill.walletId && billDate <= today;
+        const isDueToday = billDate.getTime() === today.getTime();
+        const isDueForPayment = !bill.isPaid && bill.autoDeduct && bill.walletId && isDueToday;
 
         if (isDueForPayment) {
             try {
@@ -92,13 +94,10 @@ export async function processDueBills(
 
                     if (wallet.balance < billAmount) {
                         console.warn(`Insufficient balance for bill ${bill.title}`);
-                        // Only toast if it's strictly due today to avoid spamming for old bills? 
-                        // Or just log it. Toast might be annoying if bulk processing.
-                        // toast.error(`Insufficient balance to pay ${bill.title}`, { duration: 3000 });
                         failed++;
                     } else {
-                        // Use transaction service for atomic update
-                        await transactionService.addTransactionWithWallet({
+                        // Use atomic payment method to prevent duplicates
+                        await transactionService.payBillAtomic(bill.id!, {
                             userId: userId,
                             title: `Auto-pay: ${bill.title}`,
                             subtitle: 'Automatic Bill Payment',
@@ -110,15 +109,18 @@ export async function processDueBills(
                             walletId: bill.walletId
                         }, exchangeRates);
 
-                        await billService.updateBill(bill.id!, { isPaid: true });
-
                         processed++;
                         toast.success(`Auto-paid: ${bill.title}`, { duration: 3000 });
                     }
                 }
             } catch (err) {
-                console.error(`Error processing bill payment ${bill.id}:`, err);
-                failed++;
+                // If already paid (race condition), don't count as failed
+                if (err instanceof Error && err.message.includes("already paid")) {
+                    console.log(`Bill ${bill.title} was already paid.`);
+                } else {
+                    console.error(`Error processing bill payment ${bill.id}:`, err);
+                    failed++;
+                }
             }
         }
 
@@ -141,7 +143,7 @@ export async function processDueBills(
                 }
 
                 // Helper to ensure we don't mutate original
-                let cursorDate = new Date(lastGenDate);
+                const cursorDate = new Date(lastGenDate);
                 cursorDate.setHours(0, 0, 0, 0);
 
                 // If this is the first run (no lastGenDate recorded), we might need to verify 
@@ -155,57 +157,36 @@ export async function processDueBills(
                 // Jan 2 <= Jan 5? Yes. Create. Recurse.
 
                 let nextDueDate = calculateNextDueDate(cursorDate, bill.frequency);
-                let newlyGeneratedCount = 0;
                 let lastSuccessfullyGeneratedDate = cursorDate;
 
                 while (nextDueDate <= today) {
-                    // Clone date for storage
                     const dueDateToSave = new Date(nextDueDate);
                     dueDateToSave.setHours(0, 0, 0, 0);
 
-                    // Check if this specific instance already exists
-                    // We check by: same parent + same due date OR same title + same amount + same due date
-                    const alreadyExists = bills.some(b => {
-                        const bDate = b.dueDate instanceof Timestamp ? b.dueDate.toDate() : new Date(b.dueDate);
-                        bDate.setHours(0, 0, 0, 0);
+                    // Deterministic ID: rec_{parentId}_{timestamp}
+                    const deterministicId = `rec_${bill.id}_${dueDateToSave.getTime()}`;
 
-                        const dateMatch = bDate.getTime() === dueDateToSave.getTime();
-                        if (!dateMatch) return false;
-
-                        if (bill.id && b.parentBillId === bill.id) return true;
-
-                        // Fallback checking for legacy data or if parentBillId missing
-                        return b.title === bill.title && b.amount === bill.amount && !b.isPaid;
+                    // Use deterministic ID - if doc exists, it's a no-op
+                    await billService.addBillDeterministic(deterministicId, {
+                        userId: bill.userId,
+                        title: bill.title,
+                        amount: bill.amount,
+                        currency: bill.currency,
+                        dueDate: dueDateToSave,
+                        category: bill.category,
+                        isPaid: false,
+                        frequency: 'once',
+                        walletId: bill.walletId,
+                        autoDeduct: bill.autoDeduct,
+                        parentBillId: bill.id
                     });
 
-                    if (!alreadyExists) {
-                        await billService.addBill({
-                            userId: bill.userId,
-                            title: bill.title,
-                            amount: bill.amount,
-                            currency: bill.currency,
-                            dueDate: dueDateToSave,
-                            category: bill.category,
-                            isPaid: false,
-                            frequency: 'once', // Generated instances are one-time
-                            walletId: bill.walletId,
-                            autoDeduct: bill.autoDeduct,
-                            parentBillId: bill.id
-                        });
-
-                        recurring++;
-                        newlyGeneratedCount++;
-                        lastSuccessfullyGeneratedDate = nextDueDate;
-                    } else {
-                        // Duplicate found, skip
-                        lastSuccessfullyGeneratedDate = nextDueDate;
-                    }
-
+                    recurring++;
+                    lastSuccessfullyGeneratedDate = nextDueDate;
                     nextDueDate = calculateNextDueDate(nextDueDate, bill.frequency);
                 }
 
                 // Update the parent bill with the progress
-                // We update this even if we skipped duplicates, to advance the cursor.
                 if (lastSuccessfullyGeneratedDate > lastGenDate) {
                     await billService.updateBill(bill.id!, {
                         lastGeneratedDueDate: lastSuccessfullyGeneratedDate

@@ -60,7 +60,7 @@ export default function Dashboard() {
                     ) : (
                         <GradientCard variant="ocean">
                             <Typography variant="subtitle2" sx={{ opacity: 0.8 }}>Total Balance ({baseCurrency})</Typography>
-                            <Tooltip title={currencyService.format(stats.totalBalance, baseCurrency)} arrow placement="bottom">
+                            <Tooltip title={currencyService.formatClean(stats.totalBalance, baseCurrency)} arrow placement="bottom">
                                 <Typography
                                     variant="h3"
                                     fontWeight="bold"
@@ -171,7 +171,7 @@ export default function Dashboard() {
                                                 subtitle={item.subtitle || category?.name || 'General'}
                                                 amount={(() => {
                                                     const num = typeof item.amount === 'number' ? item.amount : parseFloat(String(item.amount).replace(/[^0-9.-]+/g, "") || "0");
-                                                    const formatted = currencyService.format(Math.abs(num), item.currency || 'USD');
+                                                    const formatted = currencyService.formatClean(Math.abs(num), item.currency || 'USD');
                                                     return num > 0 ? `+${formatted}` : `-${formatted}`;
                                                 })()}
                                                 secondaryAmount={(() => {
@@ -179,7 +179,7 @@ export default function Dashboard() {
                                                     const num = typeof item.amount === 'number' ? item.amount : parseFloat(String(item.amount).replace(/[^0-9.-]+/g, "") || "0");
                                                     const amountUSD = currencyService.convertToUSD(Math.abs(num), item.currency || 'USD', exchangeRates);
                                                     const amountBase = currencyService.convertFromUSD(amountUSD, baseCurrency, exchangeRates);
-                                                    return currencyService.format(amountBase, baseCurrency);
+                                                    return currencyService.formatClean(amountBase, baseCurrency);
                                                 })()}
                                                 date={item.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                 icon={category ? getMaterialIcon(category.icon) : (item.flow === 'income' ? <CallReceived /> : <CallMade />)}

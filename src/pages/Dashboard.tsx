@@ -3,10 +3,10 @@ import MainLayout from "../components/Layout/MainLayout";
 import PageHeader from "../components/Common/PageHeader";
 import GradientCard from "../components/Common/GradientCard";
 import TransactionItem from "../components/Common/TransactionItem";
-import { Card, CardContent, Grid, Typography, Box, List, Button, Tooltip } from "@mui/material";
+import { Card, CardContent, Grid, Typography, Box, List, Button, Tooltip, Avatar } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useFinance } from "../context/FinanceContext";
-import { CallReceived, CallMade, TrendingUp } from "@mui/icons-material";
+import { CallReceived, CallMade, TrendingUp, ReceiptLong } from "@mui/icons-material";
 
 import { currencyService } from "../services/currencyService";
 import { getMaterialIcon } from "../components/Common/CategoryIcon";
@@ -29,7 +29,10 @@ export default function Dashboard() {
     } = useFinance();
     const navigate = useNavigate();
     const recentTransactions = transactions.slice(0, 3);
-    const upcomingBills = bills.filter(b => !b.isPaid).slice(0, 3);
+    const upcomingBills = bills
+        .filter(b => !b.isPaid)
+        .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime()) // Sort by due date (soonest/overdue first)
+        .slice(0, 10);
 
     return (
         <MainLayout>
@@ -92,40 +95,116 @@ export default function Dashboard() {
                 {/* Quick Stats or Actions */}
                 <Grid size={{ xs: 12, md: 4 }}>
                     <Card sx={{
-                        borderRadius: '16px',
-                        height: '100%',
-                        p: 3,
+                        borderRadius: '24px',
+                        height: 'auto',
                         display: 'flex',
                         flexDirection: 'column',
-                        justifyContent: 'center',
-                        border: '1px dashed',
+                        border: '1px solid',
                         borderColor: 'divider',
                         bgcolor: 'background.paper',
-                        boxShadow: 'none'
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                        overflow: 'hidden',
+                        position: 'relative'
                     }}>
-                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>Upcoming Bills</Typography>
-                        {(upcomingBills.length === 0 || errors.bills) ? (
-                            <Typography variant="body2" color="text.secondary">No bills due.</Typography>
-                        ) : (
-                            <List disablePadding>
-                                {upcomingBills.map(bill => (
-                                    <Box key={bill.id} sx={{ mb: 1, display: 'flex', justifyContent: 'space-between' }}>
-                                        <Typography variant="body2" fontWeight="500">{bill.title}</Typography>
-                                        <Typography variant="body2" fontWeight="bold" color="error.main">
-                                            -{currencyService.formatCompact(bill.amount, bill.currency || 'PHP')}
-                                        </Typography>
-                                    </Box>
-                                ))}
-                            </List>
-                        )}
-                        <Button
-                            size="small"
-                            variant="text"
-                            sx={{ mt: 1, alignSelf: 'flex-start', color: '#06b6d4' }}
-                            onClick={() => navigate('/wallet')}
-                        >
-                            Manage Bills
-                        </Button>
+                        <Box sx={{
+                            p: 3,
+                            pb: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between'
+                        }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Avatar sx={{ bgcolor: 'rgba(6, 182, 212, 0.1)', width: 32, height: 32 }}>
+                                    <ReceiptLong sx={{ color: '#06b6d4', fontSize: 18 }} />
+                                </Avatar>
+                                <Typography variant="h6" sx={{ fontSize: '1.1rem', fontWeight: 600 }}>Upcoming Bills</Typography>
+                            </Box>
+                            {upcomingBills.length > 0 && (
+                                <Box sx={{
+                                    bgcolor: 'error.main',
+                                    color: 'white',
+                                    px: 1,
+                                    py: 0.25,
+                                    borderRadius: '12px',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 'bold'
+                                }}>
+                                    {upcomingBills.length}
+                                </Box>
+                            )}
+                        </Box>
+
+                        <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column', pt: 1, pb: '16px !important', px: 2 }}>
+                            {(upcomingBills.length === 0 || errors.bills) ? (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 6, opacity: 0.6 }}>
+                                    <ReceiptLong sx={{ fontSize: 48, mb: 1, color: 'text.disabled' }} />
+                                    <Typography variant="body2" color="text.secondary">No bills due.</Typography>
+                                </Box>
+                            ) : (
+                                <Box sx={{
+                                    flex: '0 1 auto',
+                                    overflowY: 'auto',
+                                    maxHeight: '160px',
+                                    pr: 1,
+                                    minHeight: 0,
+                                    '&::-webkit-scrollbar': {
+                                        width: '4px',
+                                    },
+                                    '&::-webkit-scrollbar-track': {
+                                        background: 'transparent',
+                                    },
+                                    '&::-webkit-scrollbar-thumb': {
+                                        background: 'rgba(0,0,0,0.1)',
+                                        borderRadius: '10px',
+                                    },
+                                    '&:hover::-webkit-scrollbar-thumb': {
+                                        background: 'rgba(0,0,0,0.2)',
+                                    }
+                                }}>
+                                    <List disablePadding>
+                                        {upcomingBills.map((bill, index) => {
+                                            const category = categories.find(c => c.id === bill.category);
+                                            const isOverdue = bill.dueDate < new Date() && !bill.isPaid;
+
+                                            return (
+                                                <TransactionItem
+                                                    key={bill.id}
+                                                    title={bill.title}
+                                                    subtitle={`${bill.frequency.charAt(0).toUpperCase() + bill.frequency.slice(1)} • ${isOverdue ? 'Overdue' : 'Due'}`}
+                                                    amount={`-${currencyService.formatCompact(bill.amount, bill.currency || 'PHP')}`}
+                                                    date={bill.dueDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                    icon={category ? getMaterialIcon(category.icon) : <ReceiptLong />}
+                                                    iconColor={category?.color || '#ef4444'}
+                                                    iconBgColor={category?.bgColor || '#fef2f2'}
+                                                    isLast={index === upcomingBills.length - 1}
+                                                />
+                                            );
+                                        })}
+                                    </List>
+                                </Box>
+                            )}
+
+                            <Box sx={{ mt: 'auto', pt: 2 }}>
+                                <Button
+                                    fullWidth
+                                    variant="outlined"
+                                    onClick={() => navigate('/wallet')}
+                                    sx={{
+                                        borderRadius: '12px',
+                                        textTransform: 'none',
+                                        color: '#06b6d4',
+                                        borderColor: 'rgba(6, 182, 212, 0.3)',
+                                        fontWeight: 600,
+                                        '&:hover': {
+                                            bgcolor: 'rgba(6, 182, 212, 0.05)',
+                                            borderColor: '#06b6d4'
+                                        }
+                                    }}
+                                >
+                                    Manage Bills
+                                </Button>
+                            </Box>
+                        </CardContent>
                     </Card>
                 </Grid>
 
@@ -182,7 +261,7 @@ export default function Dashboard() {
                                                     return currencyService.formatClean(amountBase, baseCurrency);
                                                 })()}
                                                 date={item.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                icon={category ? getMaterialIcon(category.icon) : (item.flow === 'income' ? <CallReceived /> : <CallMade />)}
+                                                icon={category ? getMaterialIcon(category.icon) : (item.flow === 'income' ? <CallMade /> : <CallReceived />)}
                                                 iconColor={category?.color || (item.flow === 'income' ? '#10b981' : '#ef4444')}
                                                 iconBgColor={category?.bgColor || (item.flow === 'income' ? '#ecfdf5' : '#fef2f2')}
                                                 isLast={index === recentTransactions.length - 1}

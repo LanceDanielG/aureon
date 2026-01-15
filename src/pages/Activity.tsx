@@ -545,7 +545,7 @@ export default function Activity() {
                                                     return currencyService.formatClean(amountBase, baseCur);
                                                 })()}
                                                 date={item.date.toLocaleDateString()}
-                                                icon={category ? getMaterialIcon(category.icon) : (item.flow === 'income' ? <CallReceived /> : <CallMade />)}
+                                                icon={category ? getMaterialIcon(category.icon) : (item.flow === 'income' ? <CallMade /> : <CallReceived />)}
                                                 iconColor={category?.color || (item.flow === 'income' ? '#10b981' : '#ef4444')}
                                                 iconBgColor={category?.bgColor || (item.flow === 'income' ? '#ecfdf5' : '#fef2f2')}
                                                 isLast={index === displayedTransactions.length - 1}
@@ -602,7 +602,7 @@ export default function Activity() {
                                                                             bgcolor: item.flow === 'income' ? '#ecfdf5' : '#fef2f2',
                                                                             color: item.flow === 'income' ? '#10b981' : '#ef4444'
                                                                         }}>
-                                                                            {item.flow === 'income' ? <CallReceived sx={{ fontSize: 16 }} /> : <CallMade sx={{ fontSize: 16 }} />}
+                                                                            {item.flow === 'income' ? <CallMade sx={{ fontSize: 16 }} /> : <CallReceived sx={{ fontSize: 16 }} />}
                                                                         </Avatar>
                                                                     )}
                                                                     <Typography variant="body2">{category?.name || 'General'}</Typography>

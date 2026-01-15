@@ -47,6 +47,11 @@ export async function processDueBills(
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // Look ahead 7 days for generating upcoming recurring bills
+    const generationHorizon = new Date(today);
+    generationHorizon.setDate(today.getDate() + 30);
+    generationHorizon.setHours(0, 0, 0, 0);
+
     let processed = 0;
     let failed = 0;
     let recurring = 0;
@@ -70,7 +75,7 @@ export async function processDueBills(
     for (const bill of dueBills) {
         // ---------- 1. Auto-deduct payment ----------
         // Only if not paid, auto-deduct is on, wallet is set, and it is due EXACTLY TODAY
-        // Overdue bills require manual payment
+        // FIX: Ensuring overdue bills from past dates are NOT auto-paid (manual only).
         const billDate = new Date(bill.dueDate);
         billDate.setHours(0, 0, 0, 0);
 
@@ -159,7 +164,7 @@ export async function processDueBills(
                 let nextDueDate = calculateNextDueDate(cursorDate, bill.frequency);
                 let lastSuccessfullyGeneratedDate = cursorDate;
 
-                while (nextDueDate <= today) {
+                while (nextDueDate <= generationHorizon) {
                     const dueDateToSave = new Date(nextDueDate);
                     dueDateToSave.setHours(0, 0, 0, 0);
 
@@ -210,11 +215,38 @@ export function hasDueBills(bills: Bill[]): boolean {
     today.setHours(0, 0, 0, 0);
 
     return bills.some(bill => {
-        if (!bill.autoDeduct || bill.isPaid || !bill.walletId) return false;
+        // 1. Check for payment (strict today)
+        if (bill.autoDeduct && !bill.isPaid && bill.walletId) {
+            const billDate = new Date(bill.dueDate);
+            billDate.setHours(0, 0, 0, 0);
+            if (billDate <= today) return true;
+        }
 
-        const billDate = new Date(bill.dueDate);
-        billDate.setHours(0, 0, 0, 0);
+        // 2. Check for recurring generation (within 7 days)
+        if (bill.frequency !== 'once') {
+            // Look ahead 7 days
+            const generationHorizon = new Date(today);
+            generationHorizon.setDate(today.getDate() + 7);
+            generationHorizon.setHours(0, 0, 0, 0);
 
-        return billDate <= today;
+            let lastGenDate: Date;
+            if (bill.lastGeneratedDueDate) {
+                lastGenDate = bill.lastGeneratedDueDate instanceof Timestamp
+                    ? bill.lastGeneratedDueDate.toDate()
+                    : new Date(bill.lastGeneratedDueDate);
+            } else {
+                lastGenDate = bill.dueDate instanceof Timestamp
+                    ? bill.dueDate.toDate()
+                    : new Date(bill.dueDate);
+            }
+
+            const cursorDate = new Date(lastGenDate);
+            cursorDate.setHours(0, 0, 0, 0);
+            const nextDueDate = calculateNextDueDate(cursorDate, bill.frequency);
+
+            if (nextDueDate <= generationHorizon) return true;
+        }
+
+        return false;
     });
 }

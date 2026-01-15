@@ -6,8 +6,7 @@ import {
     setDoc,
     getDoc,
     updateDoc,
-    deleteDoc,
-    doc
+    deleteDoc
 } from 'firebase/firestore';
 
 // Mock data
